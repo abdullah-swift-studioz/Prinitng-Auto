@@ -1,0 +1,16 @@
+{
+  "name": "printing-kiosk-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "start": "npm run start --workspaces"
+  },
+  "devDependencies": {
+    "turbo": "^1.10.0"
+  }
+}
