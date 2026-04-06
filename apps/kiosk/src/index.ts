@@ -42,18 +42,30 @@ async function processJob(job: any) {
     console.log(`Processing Job #${job.id} (File: ${job.fileId})`);
 
     // 2. Download File
-    const fileUrl = `${API_URL.replace('/api', '')}/uploads/${job.fileId}`;
+    // We keep the /api prefix because routing /uploads/ directly causes reverse proxies 
+    // to map the request to the Next.js frontend, resulting in HTML 404 pages.
+    const fileUrl = `${API_URL}/uploads/${job.fileId}`;
     const filePath = path.join(TEMP_DIR, `job_${job.id}_${job.fileId}`);
 
     try {
         console.log(`⬇️  Downloading from ${fileUrl}...`);
-        const writer = fs.createWriteStream(filePath);
+        
         const response = await axios({
             url: fileUrl,
             method: 'GET',
-            responseType: 'stream'
+            responseType: 'stream',
+            validateStatus: () => true // Allow all statuses so we intercept proxies returning 200 OK
         });
 
+        // Strict fallback: if AWS proxies a 404 as a 200 OK HTML error page, catch it here.
+        const contentType = response.headers['content-type'] || '';
+        if (response.status !== 200 || contentType.includes('text/html')) {
+            console.error(`❌ Job #${job.id} aborted: Received ${response.status} or invalid content type (${contentType}). File may be missing on AWS.`);
+            // Mark job complete with error (optional, or just skip it)
+            return;
+        }
+
+        const writer = fs.createWriteStream(filePath);
         response.data.pipe(writer);
 
         await new Promise<void>((resolve, reject) => {

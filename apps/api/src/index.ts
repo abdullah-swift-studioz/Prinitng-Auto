@@ -9,7 +9,8 @@ const PORT = process.env.PORT || 3004;
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static('uploads')); // Kept for backwards compatibility
+app.use('/api/uploads', express.static('uploads')); // Proxy-safe route
 
 app.use('/api/upload', uploadRouter);
 app.use('/api/jobs', jobsRouter);
