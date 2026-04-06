@@ -511,8 +511,23 @@ function UploadPageContent() {
     const [copies, setCopies] = useState(1);
     const [status, setStatus] = useState<Status>('IDLE');
     const [isCreatingJob, setIsCreatingJob] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+
+    const [token, setToken] = useState<string | null>(null);
+    const [walletBal, setWalletBal] = useState<number | null>(null);
 
     const totalPrice = metadata ? metadata.pageCount * copies * PRICE_PER_PAGE_PKR : 0;
+
+    useEffect(() => {
+        const t = localStorage.getItem('kiosk_token');
+        if (t) {
+            setToken(t);
+            fetch(`${API_BASE}/api/wallet/balance`, { headers: { Authorization: `Bearer ${t}` } })
+                .then(r => r.json())
+                .then(d => { if (d.balance !== undefined) setWalletBal(d.balance); })
+                .catch(() => {});
+        }
+    }, []);
 
     useEffect(() => {
         if (!jobId || (status !== 'SUCCESS' && status !== 'AWAITING_ADMIN')) return;
@@ -538,6 +553,7 @@ function UploadPageContent() {
         const selectedFile = e.target.files?.[0];
         if (!selectedFile) return;
         setFile(selectedFile);
+        setUploadError(null);
         setStatus('UPLOADING');
 
         const formData = new FormData();
@@ -546,24 +562,53 @@ function UploadPageContent() {
         try {
             const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
             const data = await res.json();
-            if (res.ok) { setMetadata(data); setStatus('CONFIGURING'); }
-            else { setStatus('IDLE'); }
-        } catch { setStatus('IDLE'); }
+            if (res.ok) {
+                setMetadata(data);
+                setStatus('CONFIGURING');
+            } else {
+                setUploadError(data.error || `Upload failed (${res.status})`);
+                setStatus('IDLE');
+            }
+        } catch (err) {
+            setUploadError('Cannot reach the server. Make sure the API is running.');
+            setStatus('IDLE');
+        }
     };
 
     const handleCreateJob = async () => {
         if (!metadata || isCreatingJob) return;
         setIsCreatingJob(true);
         try {
+            const reqBody: any = { fileId: metadata.fileId, pageCount: metadata.pageCount, copies, kioskId };
             const res = await fetch(`${API_BASE}/api/jobs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileId: metadata.fileId, pageCount: metadata.pageCount, copies, kioskId }),
+                body: JSON.stringify(reqBody),
             });
             const job = await res.json();
             if (res.ok) { setJobId(job.id); setStatus('PAYING'); }
         } catch { /* stay on CONFIGURING */ }
         finally { setIsCreatingJob(false); }
+    };
+
+    const handleWalletPayment = async () => {
+        if (!jobId || !token) return;
+        setStatus('VERIFYING_PAYMENT');
+        try {
+            const res = await fetch(`${API_BASE}/api/jobs/${jobId}/pay-wallet`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setStatus('SUCCESS');
+            } else {
+                setUploadError('Wallet payment failed or insufficient balance.');
+                setStatus('PAYING');
+            }
+        } catch {
+            setUploadError('Network error');
+            setStatus('PAYING');
+        }
     };
 
     const handleVerifyPayment = async () => {
@@ -731,19 +776,35 @@ function UploadPageContent() {
                                     <p className="up-analyzing">Analyzing document…</p>
                                 </div>
                             ) : (
-                                <label className="up-drop-label">
-                                    <div className="up-icon-bg">
-                                        <CloudArrowUp size={36} color="#3ab30a" />
-                                    </div>
-                                    <p className="up-tap-text">Tap to select file</p>
-                                    <p className="up-file-types">PDF, JPG, or PNG</p>
-                                    <input
-                                        type="file"
-                                        onChange={handleFileChange}
-                                        style={{ display: 'none' }}
-                                        accept=".pdf,image/*"
-                                    />
-                                </label>
+                                <>
+                                    {uploadError && (
+                                        <div style={{
+                                            padding: '12px 16px',
+                                            marginBottom: '12px',
+                                            background: 'rgba(239,68,68,0.08)',
+                                            border: '1px solid rgba(239,68,68,0.25)',
+                                            borderRadius: '12px',
+                                            color: '#dc2626',
+                                            fontSize: '13px',
+                                            lineHeight: 1.5,
+                                        }}>
+                                            {uploadError}
+                                        </div>
+                                    )}
+                                    <label className="up-drop-label">
+                                        <div className="up-icon-bg">
+                                            <CloudArrowUp size={36} color="#3ab30a" />
+                                        </div>
+                                        <p className="up-tap-text">Tap to select file</p>
+                                        <p className="up-file-types">PDF, JPG, or PNG</p>
+                                        <input
+                                            type="file"
+                                            onChange={handleFileChange}
+                                            style={{ display: 'none' }}
+                                            accept=".pdf,image/*"
+                                        />
+                                    </label>
+                                </>
                             )}
                         </div>
                     )}
@@ -803,43 +864,62 @@ function UploadPageContent() {
                             {/* Payment instructions (PAYING only) */}
                             {status === 'PAYING' && (
                                 <>
-                                    <div className="pay-box">
-                                        <div className="pay-heading">
-                                            Transfer exactly PKR {totalPrice} to:
+                                    {uploadError && (
+                                        <div style={{ padding: '10px', background: '#fee2e2', color: '#dc2626', borderRadius: '12px', fontSize: '13px' }}>
+                                            {uploadError}
                                         </div>
-                                        {([
-                                            ['Account', 'Ayesha Awais'],
-                                            ['NayaPay #', '03234563464'],
-                                            ['ID', 'ayesha.624@nayapay'],
-                                            ['IBAN', 'PK26NAYA1234503234563464'],
-                                        ] as [string, string][]).map(([label, value]) => (
-                                            <div key={label} className="pay-row">
-                                                <span className="pay-row-label">{label}</span>
-                                                <span className="pay-row-val">{value}</span>
-                                            </div>
-                                        ))}
-                                        <p className="pay-note">
-                                            Send the exact amount to enable auto-verification.
-                                        </p>
-                                    </div>
+                                    )}
 
-                                    <div>
-                                        <label className="input-label">
-                                            Your NayaPay Account Title
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="account-input"
-                                            placeholder="e.g. Muhammad Ali"
-                                            value={accountTitle}
-                                            onChange={e => setAccountTitle(e.target.value)}
-                                            autoComplete="off"
-                                            autoCorrect="off"
-                                        />
-                                        <p className="input-hint">
-                                            Must match the name shown in your NayaPay account exactly.
-                                        </p>
-                                    </div>
+                                    {token !== null && walletBal !== null && walletBal >= totalPrice ? (
+                                        <div className="pay-box" style={{ borderColor: '#4fda0f' }}>
+                                            <div className="pay-heading">Instant Wallet Payment</div>
+                                            <div className="pay-row">
+                                                <span className="pay-row-label">Available Balance</span>
+                                                <span className="pay-row-val">PKR {walletBal}</span>
+                                            </div>
+                                            <p className="pay-note">You have enough funds. Pay instantly below.</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="pay-box">
+                                                <div className="pay-heading">
+                                                    Transfer exactly PKR {totalPrice} to:
+                                                </div>
+                                                {([
+                                                    ['Account', 'Ayesha Awais'],
+                                                    ['NayaPay #', '03234563464'],
+                                                    ['ID', 'ayesha.624@nayapay'],
+                                                    ['IBAN', 'PK26NAYA1234503234563464'],
+                                                ] as [string, string][]).map(([label, value]) => (
+                                                    <div key={label} className="pay-row">
+                                                        <span className="pay-row-label">{label}</span>
+                                                        <span className="pay-row-val">{value}</span>
+                                                    </div>
+                                                ))}
+                                                <p className="pay-note">
+                                                    Send the exact amount to enable auto-verification.
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <label className="input-label">
+                                                    Your NayaPay Account Title
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="account-input"
+                                                    placeholder="e.g. Muhammad Ali"
+                                                    value={accountTitle}
+                                                    onChange={e => setAccountTitle(e.target.value)}
+                                                    autoComplete="off"
+                                                    autoCorrect="off"
+                                                />
+                                                <p className="input-hint">
+                                                    Must match the name shown in your NayaPay account exactly.
+                                                </p>
+                                            </div>
+                                        </>
+                                    )}
                                 </>
                             )}
                         </>
@@ -864,13 +944,22 @@ function UploadPageContent() {
                             </button>
                         )}
                         {status === 'PAYING' && (
-                            <button
-                                className="btn-dark-green"
-                                onClick={handleVerifyPayment}
-                                disabled={!accountTitle.trim()}
-                            >
-                                I Have Paid
-                            </button>
+                            token !== null && walletBal !== null && walletBal >= totalPrice ? (
+                                <button
+                                    className="btn-dark-green"
+                                    onClick={handleWalletPayment}
+                                >
+                                    Pay PKR {totalPrice} Instantly
+                                </button>
+                            ) : (
+                                <button
+                                    className="btn-dark-green"
+                                    onClick={handleVerifyPayment}
+                                    disabled={!accountTitle.trim()}
+                                >
+                                    I Have Paid
+                                </button>
+                            )
                         )}
                     </div>
                 )}

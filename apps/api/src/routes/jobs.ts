@@ -1,132 +1,163 @@
 import { Router } from 'express';
 import { checkPayment } from '../services/emailPayment';
+import { authenticate, AuthenticatedRequest } from '../middleware/auth';
+import { prisma } from '../config/db';
 
 const router = Router();
 
-// Mock database for jobs
-export const jobs: any[] = [];
-let jobIdCounter = 1;
-
-// GET /api/jobs -> List all jobs (for Admin)
-router.get('/', (req, res) => {
+// GET /api/jobs -> List all pending jobs (for Admin)
+router.get('/', async (req, res) => {
+    const jobs = await prisma.job.findMany({
+        where: { OR: [{ status: 'PENDING' }, { status: 'PAID' }] },
+        orderBy: { createdAt: 'desc' }
+    });
     res.json(jobs);
 });
 
-// GET /api/jobs/kiosk/:kioskId -> Must be before /:id to avoid matching "kiosk" as id
-router.get('/kiosk/:kioskId', (req, res) => {
+// GET /api/jobs/kiosk/:kioskId -> Kiosk polling for PAID jobs
+router.get('/kiosk/:kioskId', async (req, res) => {
     const { kioskId } = req.params;
-    const pendingJobs = jobs.filter(j => j.kioskId === kioskId && j.status === 'PAID');
+    const pendingJobs = await prisma.job.findMany({
+        where: { kioskId, status: 'PAID' }
+    });
     res.json(pendingJobs);
 });
 
 // GET /api/jobs/:id -> Get single job status
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
     const jobId = parseInt(req.params.id);
-    const job = jobs.find(j => j.id === jobId);
+    const job = await prisma.job.findUnique({ where: { id: jobId } });
 
     if (!job) return res.status(404).json({ error: 'Job not found' });
-
     res.json(job);
 });
 
-// POST /api/jobs -> Create a new job (after upload & options selection)
-router.post('/', (req, res) => {
-    const { fileId, pageCount, copies, kioskId } = req.body;
+// POST /api/jobs -> Create a new job (after upload) - supports optional auth
+router.post('/', async (req, res) => {
+    const { fileId, pageCount, copies, kioskId, userId } = req.body;
 
-    // Calculate price (PKR per page)
     const PRICE_PER_PAGE = 10;
     const totalPages = pageCount * copies;
     const totalPrice = totalPages * PRICE_PER_PAGE;
 
-    const newJob = {
-        id: jobIdCounter++,
-        fileId,
-        pageCount,
-        copies,
-        kioskId,
-        totalPrice,
-        status: 'PENDING', // PENDING -> PAID -> PRINTING -> COMPLETED
-        createdAt: new Date()
-    };
-
-    jobs.push(newJob);
-    res.json(newJob);
+    try {
+        const newJob = await prisma.job.create({
+            data: {
+                fileId,
+                pageCount,
+                copies,
+                kioskId,
+                totalPrice,
+                status: 'PENDING',
+                userId: userId || null
+            }
+        });
+        res.json(newJob);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to create job' });
+    }
 });
 
-// POST /api/jobs/:id/pay -> Mock payment (for dev/testing)
-router.post('/:id/pay', (req, res) => {
+// POST /api/jobs/:id/pay-wallet -> Pay instantly via wallet
+router.post('/:id/pay-wallet', authenticate, async (req: AuthenticatedRequest, res) => {
     const jobId = parseInt(req.params.id);
-    const job = jobs.find(j => j.id === jobId);
+    
+    try {
+        const job = await prisma.job.findUnique({ where: { id: jobId } });
+        if (!job) return res.status(404).json({ error: 'Job not found' });
+        if (job.status !== 'PENDING') return res.status(400).json({ error: 'Job not pending' });
 
-    if (!job) return res.status(404).json({ error: 'Job not found' });
+        const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+        if (!user || user.balance < job.totalPrice) {
+            return res.status(400).json({ error: 'Insufficient wallet balance', balance: user?.balance || 0 });
+        }
 
-    job.status = 'PAID';
-    res.json({ success: true, job });
+        await prisma.$transaction([
+            prisma.user.update({
+                where: { id: user.id },
+                data: { balance: { decrement: job.totalPrice } }
+            }),
+            prisma.job.update({
+                where: { id: jobId },
+                data: { status: 'PAID' }
+            })
+        ]);
+
+        res.json({ success: true, balance: user.balance - job.totalPrice });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Wallet payment failed' });
+    }
 });
 
-// POST /api/jobs/:id/verify-payment -> Verify bank transfer via email
+// POST /api/jobs/:id/verify-payment -> Standard NayaPay email verification logic
 router.post('/:id/verify-payment', async (req, res) => {
     const jobId = parseInt(req.params.id);
-    const job = jobs.find(j => j.id === jobId);
-
-    if (!job) return res.status(404).json({ error: 'Job not found' });
-    if (job.status !== 'PENDING') return res.status(400).json({ error: 'Job already paid or completed' });
-
-    const { accountTitle } = req.body;
-    if (!accountTitle || typeof accountTitle !== 'string') {
-        return res.status(400).json({ error: 'Account title is required' });
-    }
-
-    // Store account title on the job so admin can see it even if auto-verification fails
-    job.accountTitle = accountTitle.trim();
-    job.lastVerificationAttempt = new Date();
-
-    // totalPrice is stored in PKR (pageCount * copies * 10)
-    const targetAmount = job.totalPrice;
-
+    
     try {
+        const job = await prisma.job.findUnique({ where: { id: jobId } });
+        if (!job) return res.status(404).json({ error: 'Job not found' });
+        if (job.status !== 'PENDING') return res.status(400).json({ error: 'Job already paid or completed' });
+
+        const { accountTitle } = req.body;
+        if (!accountTitle || typeof accountTitle !== 'string') {
+            return res.status(400).json({ error: 'Account title is required' });
+        }
+
+        // Update attempt metadata
+        await prisma.job.update({
+            where: { id: jobId },
+            data: { accountTitle: accountTitle.trim(), lastVerificationAttempt: new Date() }
+        });
+
         let matched = false;
         if (process.env.SKIP_EMAIL_VERIFICATION === 'true') {
-            matched = true; // Dev bypass when email not configured
+            matched = true;
         } else {
-            const result = await checkPayment(targetAmount, accountTitle.trim());
+            const result = await checkPayment(job.totalPrice, accountTitle.trim());
             matched = result.matched;
         }
 
         if (matched) {
-            job.status = 'PAID';
-            return res.json({ success: true, job });
+            const updated = await prisma.job.update({
+                where: { id: jobId },
+                data: { status: 'PAID' }
+            });
+            return res.json({ success: true, job: updated });
         }
-        return res.status(400).json({ error: 'Payment not found. Please ensure you transferred the exact amount and your account title matches.' });
+        return res.status(400).json({ error: 'Payment not found. Ensure exact transfer amount and account title.' });
     } catch (error) {
-        console.error('Payment verification error:', error);
-        return res.status(500).json({ error: 'Payment verification failed. Please try again.' });
+        console.error(error);
+        return res.status(500).json({ error: 'Payment verification failed.' });
     }
 });
 
-// POST /api/jobs/:id/approve -> Admin manually approves a pending payment
-router.post('/:id/approve', (req, res) => {
+// POST /api/jobs/:id/approve -> Admin manual approval for standard print
+router.post('/:id/approve', async (req, res) => {
     const jobId = parseInt(req.params.id);
-    const job = jobs.find(j => j.id === jobId);
-
-    if (!job) return res.status(404).json({ error: 'Job not found' });
-    if (job.status !== 'PENDING') return res.status(400).json({ error: 'Job is not pending' });
-
-    job.status = 'PAID';
-    job.approvedByAdmin = true;
-    job.approvedAt = new Date();
-    res.json({ success: true, job });
+    try {
+        const job = await prisma.job.update({
+            where: { id: jobId },
+            data: { status: 'PAID', approvedByAdmin: true, approvedAt: new Date() }
+        });
+        res.json({ success: true, job });
+    } catch (e) {
+        res.status(400).json({ error: 'Failed to approve job' });
+    }
 });
 
 // POST /api/jobs/:id/complete -> Kiosk marks job as printed
-router.post('/:id/complete', (req, res) => {
+router.post('/:id/complete', async (req, res) => {
     const jobId = parseInt(req.params.id);
-    const job = jobs.find(j => j.id === jobId);
-
-    if (!job) return res.status(404).json({ error: 'Job not found' });
-
-    job.status = 'COMPLETED';
-    res.json({ success: true, job });
+    try {
+        const job = await prisma.job.update({
+            where: { id: jobId },
+            data: { status: 'COMPLETED' }
+        });
+        res.json({ success: true, job });
+    } catch (e) {
+        res.status(404).json({ error: 'Job update failed' });
+    }
 });
 
 export default router;

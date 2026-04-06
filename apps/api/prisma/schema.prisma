@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  passwordHash String
+  balance      Float         @default(0.0)
+  createdAt    DateTime      @default(now())
+  
+  topUps       TopUpRequest[]
+  jobs         Job[]
+}
+
+model TopUpRequest {
+  id                  Int      @id @default(autoincrement())
+  user                User     @relation(fields: [userId], references: [id])
+  userId              Int
+  amount              Float
+  nayapayAccountTitle String
+  status              String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt           DateTime @default(now())
+  processedAt         DateTime?
+}
+
+model Job {
+  id                      Int      @id @default(autoincrement())
+  fileId                  String
+  pageCount               Int
+  copies                  Int
+  kioskId                 String
+  totalPrice              Float
+  status                  String   @default("PENDING") // PENDING, PAID, PRINTING, COMPLETED
+  createdAt               DateTime @default(now())
+  
+  user                    User?    @relation(fields: [userId], references: [id])
+  userId                  Int?
+  
+  accountTitle            String?
+  lastVerificationAttempt DateTime?
+  approvedByAdmin         Boolean  @default(false)
+  approvedAt              DateTime?
+}

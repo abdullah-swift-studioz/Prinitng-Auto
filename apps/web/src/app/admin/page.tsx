@@ -25,11 +25,37 @@ export default function AdminDashboard() {
     const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
 
+    const [topUps, setTopUps] = useState<any[]>([]);
+
     const fetchVideos = async () => {
         try {
             const res = await fetch(`${API_BASE}/api/videos`);
             if (res.ok) setVideos(await res.json());
         } catch { /* ignore */ }
+    };
+
+    const fetchTopUps = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/wallet/admin/topups`);
+            if (res.ok) setTopUps(await res.json());
+        } catch { /* ignore */ }
+    };
+
+    const approveTopUp = async (id: number) => {
+        if (!confirm('Are you sure you verified this transfer?')) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/wallet/admin/approve/${id}`, { method: 'POST' });
+            if (res.ok) await fetchTopUps();
+            else alert('Failed to approve top up');
+        } catch { alert('Network error'); }
+    };
+
+    const rejectTopUp = async (id: number) => {
+        if (!confirm('Reject this transfer?')) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/wallet/admin/reject/${id}`, { method: 'POST' });
+            if (res.ok) await fetchTopUps();
+        } catch { alert('Network error'); }
     };
 
     const uploadVideo = async (file: File) => {
@@ -97,6 +123,7 @@ export default function AdminDashboard() {
     useEffect(() => {
         fetchJobs();
         fetchVideos();
+        fetchTopUps();
     }, []);
 
     const pendingJobs = jobs.filter(j => j.status === 'PENDING');
@@ -417,6 +444,61 @@ export default function AdminDashboard() {
                                     </button>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Wallet Top-Ups */}
+                <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden mt-8">
+                    <div className="p-6 border-b border-emerald-100 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <CurrencyDollar size={22} weight="fill" className="text-emerald-500" />
+                            <h2 className="text-xl font-bold text-gray-800">Pending Wallet Top-Ups</h2>
+                            <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                                {topUps.length} pending
+                            </span>
+                        </div>
+                        <button
+                            onClick={fetchTopUps}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg text-gray-600 text-sm border font-medium hover:bg-gray-100"
+                        >
+                            Refresh
+                        </button>
+                    </div>
+
+                    {topUps.length === 0 ? (
+                        <div className="px-6 py-12 text-center text-gray-400">
+                            No pending top-up requests.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-emerald-50 text-emerald-800 text-sm uppercase tracking-wider">
+                                        <th className="px-6 py-4 font-semibold">User</th>
+                                        <th className="px-6 py-4 font-semibold">Account Title</th>
+                                        <th className="px-6 py-4 font-semibold">Amount</th>
+                                        <th className="px-6 py-4 font-semibold">Submitted</th>
+                                        <th className="px-6 py-4 font-semibold">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-50">
+                                    {topUps.map((t) => (
+                                        <tr key={t.id} className="hover:bg-emerald-50/30 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-gray-900">{t.user?.email}</td>
+                                            <td className="px-6 py-4 font-medium text-gray-800">{t.nayapayAccountTitle}</td>
+                                            <td className="px-6 py-4 font-bold text-emerald-600">PKR {t.amount}</td>
+                                            <td className="px-6 py-4 text-gray-500 text-sm">{new Date(t.createdAt).toLocaleString()}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => approveTopUp(t.id)} className="px-3 py-1 bg-green-600 text-white rounded font-medium text-sm hover:bg-green-700">Approve</button>
+                                                    <button onClick={() => rejectTopUp(t.id)} className="px-3 py-1 bg-red-100 text-red-600 rounded font-medium text-sm hover:bg-red-200">Reject</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>

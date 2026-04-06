@@ -7,7 +7,7 @@ const router = Router();
 
 const videoStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const dir = 'uploads/videos';
+        const dir = path.join(__dirname, '../../uploads/videos');
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         cb(null, dir);
     },
@@ -73,7 +73,7 @@ router.delete('/:id', (req, res) => {
 
     const [video] = videos.splice(idx, 1);
 
-    const filePath = path.join('uploads/videos', video.filename);
+    const filePath = path.join(__dirname, '../../uploads/videos', video.filename);
     try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     } catch { /* ignore fs errors */ }

@@ -1,12 +1,35 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 function HomeContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const kioskId = searchParams.get('kiosk_id') || 'default';
+    
+    const [token, setToken] = useState<string | null>(null);
+    const [email, setEmail] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const t = localStorage.getItem('kiosk_token');
+        const e = localStorage.getItem('kiosk_user_email');
+        if (t) {
+            setToken(t);
+            setEmail(e);
+        }
+        setLoading(false);
+    }, []);
+
+    const handleLogout = () => {
+        localStorage.removeItem('kiosk_token');
+        localStorage.removeItem('kiosk_user_email');
+        setToken(null);
+        setEmail(null);
+    };
+
+    if (loading) return null;
 
     return (
         <>
@@ -43,12 +66,19 @@ function HomeContent() {
                     z-index: 1;
                     padding: 44px 28px 0;
                     flex-shrink: 0;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
                 }
                 .home-logo {
                     width: 100px;
                     height: auto;
                     object-fit: contain;
                     display: block;
+                }
+                .logout-btn {
+                    font-size: 13px; font-weight: 600; color: #ef4444; background: rgba(239, 68, 68, 0.1);
+                    padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer;
                 }
 
                 /* hero — fills remaining space */
@@ -85,7 +115,7 @@ function HomeContent() {
                 }
                 .home-headline {
                     font-family: 'Bebas Neue', sans-serif;
-                    font-size: clamp(72px, 23vw, 120px);
+                    font-size: clamp(64px, 20vw, 120px);
                     line-height: 0.9;
                     letter-spacing: 2px;
                     color: #3f4247;
@@ -103,6 +133,9 @@ function HomeContent() {
                     line-height: 1.65;
                     letter-spacing: 0.3px;
                 }
+                .home-email {
+                    font-weight: 600; color: #3f4247;
+                }
 
                 /* footer CTA — always at bottom */
                 .home-footer {
@@ -110,6 +143,9 @@ function HomeContent() {
                     z-index: 1;
                     padding: 0 28px 40px;
                     flex-shrink: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
                 }
                 .start-btn {
                     width: 100%;
@@ -146,8 +182,53 @@ function HomeContent() {
                     stroke-linejoin: round;
                     flex-shrink: 0;
                 }
+
+                .secondary-btn {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 18px 24px;
+                    background: #3f4247;
+                    border: none;
+                    border-radius: 16px;
+                    cursor: pointer;
+                    transition: transform 0.12s ease;
+                    -webkit-tap-highlight-color: transparent;
+                }
+                .secondary-btn:active { transform: scale(0.97); opacity: 0.9; }
+                .secondary-btn-text {
+                    font-family: 'Bebas Neue', sans-serif;
+                    font-size: 22px;
+                    letter-spacing: 3px;
+                    color: #ffffff;
+                    text-transform: uppercase;
+                }
+
+                .guest-btn {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 18px 24px;
+                    background: transparent;
+                    border: 1.5px solid rgba(63,66,71,0.2);
+                    border-radius: 16px;
+                    cursor: pointer;
+                    transition: transform 0.12s ease;
+                    -webkit-tap-highlight-color: transparent;
+                }
+                .guest-btn:active { transform: scale(0.97); background: rgba(63,66,71,0.05); }
+                .guest-btn-text {
+                    font-family: 'Bebas Neue', sans-serif;
+                    font-size: 22px;
+                    letter-spacing: 3px;
+                    color: #3f4247;
+                    text-transform: uppercase;
+                }
+
                 .kiosk-id-pill {
-                    margin-top: 16px;
+                    margin-top: 10px;
                     text-align: center;
                     font-family: 'Barlow Condensed', sans-serif;
                     font-size: 11px;
@@ -161,6 +242,9 @@ function HomeContent() {
                 <div className="home-header">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/logo.jpeg" alt="Print It" className="home-logo" />
+                    {token && (
+                        <button className="logout-btn" onClick={handleLogout}>Log Out</button>
+                    )}
                 </div>
 
                 <div className="home-hero">
@@ -168,27 +252,54 @@ function HomeContent() {
                         <span className="eyebrow-dot" />
                         Ready to Print
                     </div>
-                    <h1 className="home-headline">
-                        Print<br />
-                        <em>Anything.</em><br />
-                        Instantly.
-                    </h1>
-                    <p className="home-sub">
-                        Upload your document, pay via NayaPay, and collect your printout — all in under 2 minutes.
-                    </p>
+                    {token ? (
+                        <>
+                            <h1 className="home-headline">
+                                Welcome<br />
+                                <em>Back.</em>
+                            </h1>
+                            <p className="home-sub">
+                                Logged in as <span className="home-email">{email}</span>. Use your wallet balance to instantly print without waiting.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <h1 className="home-headline">
+                                Print<br />
+                                <em>Anything.</em><br />
+                                Instantly.
+                            </h1>
+                            <p className="home-sub">
+                                Upload your document and pay via NayaPay. Login to use your pre-funded wallet for instant prints.
+                            </p>
+                        </>
+                    )}
                 </div>
 
                 <div className="home-footer">
-                    <button
-                        className="start-btn"
-                        onClick={() => router.push(`/upload?kiosk_id=${kioskId}`)}
-                    >
-                        <span className="start-btn-text">Start Printing</span>
-                        <svg className="start-btn-arrow" viewBox="0 0 24 24">
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                            <polyline points="12 5 19 12 12 19" />
-                        </svg>
-                    </button>
+                    {token ? (
+                        <>
+                            <button className="start-btn" onClick={() => router.push(`/upload?kiosk_id=${kioskId}`)}>
+                                <span className="start-btn-text">Start Printing</span>
+                                <svg className="start-btn-arrow" viewBox="0 0 24 24">
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                    <polyline points="12 5 19 12 12 19" />
+                                </svg>
+                            </button>
+                            <button className="secondary-btn" onClick={() => router.push(`/wallet?kiosk_id=${kioskId}`)}>
+                                <span className="secondary-btn-text">My Wallet</span>
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button className="start-btn" onClick={() => router.push(`/login?kiosk_id=${kioskId}`)}>
+                                <span className="start-btn-text">Login / Sign Up</span>
+                            </button>
+                            <button className="guest-btn" onClick={() => router.push(`/upload?kiosk_id=${kioskId}`)}>
+                                <span className="guest-btn-text">Continue as Guest</span>
+                            </button>
+                        </>
+                    )}
                     <p className="kiosk-id-pill">Kiosk ID: {kioskId}</p>
                 </div>
             </div>

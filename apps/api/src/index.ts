@@ -12,6 +12,11 @@ app.use(express.json());
 app.use('/uploads', express.static('uploads')); // Kept for backwards compatibility
 app.use('/api/uploads', express.static('uploads')); // Proxy-safe route
 
+import authRouter from './routes/auth';
+import walletRouter from './routes/wallet';
+
+app.use('/api/auth', authRouter);
+app.use('/api/wallet', walletRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/videos', videosRouter);

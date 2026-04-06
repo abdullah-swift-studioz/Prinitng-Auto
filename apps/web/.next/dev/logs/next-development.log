@@ -171,3 +171,12 @@ Import traces:
 [00:56:25.262] Server  LOG     ✓ Compiled in 34ms
 [00:59:56.770] Server  LOG     ✓ Compiled in 45ms
 [01:01:22.255] Server  LOG     ✓ Compiled in 40ms
+[01:32:10.197] Server  LOG     ✓ Compiled in 42ms
+[01:32:17.599] Server  LOG     ✓ Compiled in 22ms
+[01:32:29.825] Server  LOG     ✓ Compiled in 32ms
+[01:41:40.599] Server  LOG     ✓ Compiled in 65ms
+[01:42:14.283] Server  LOG     ✓ Compiled in 80ms
+[01:42:15.151] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[01:42:15.152] Browser ERROR   uncaughtError: ReferenceError: topUps is not defined
+[01:42:15.236] Server  LOG     ✓ Compiled in 34ms
+[01:42:15.363] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

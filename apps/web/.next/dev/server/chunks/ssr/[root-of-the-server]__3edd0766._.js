@@ -538,7 +538,23 @@ function UploadPageContent() {
     const [copies, setCopies] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(1);
     const [status, setStatus] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])('IDLE');
     const [isCreatingJob, setIsCreatingJob] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [uploadError, setUploadError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [token, setToken] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [walletBal, setWalletBal] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const totalPrice = metadata ? metadata.pageCount * copies * PRICE_PER_PAGE_PKR : 0;
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        const t = localStorage.getItem('kiosk_token');
+        if (t) {
+            setToken(t);
+            fetch(`${API_BASE}/api/wallet/balance`, {
+                headers: {
+                    Authorization: `Bearer ${t}`
+                }
+            }).then((r)=>r.json()).then((d)=>{
+                if (d.balance !== undefined) setWalletBal(d.balance);
+            }).catch(()=>{});
+        }
+    }, []);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!jobId || status !== 'SUCCESS' && status !== 'AWAITING_ADMIN') return;
         const interval = setInterval(async ()=>{
@@ -562,6 +578,7 @@ function UploadPageContent() {
         const selectedFile = e.target.files?.[0];
         if (!selectedFile) return;
         setFile(selectedFile);
+        setUploadError(null);
         setStatus('UPLOADING');
         const formData = new FormData();
         formData.append('file', selectedFile);
@@ -575,9 +592,11 @@ function UploadPageContent() {
                 setMetadata(data);
                 setStatus('CONFIGURING');
             } else {
+                setUploadError(data.error || `Upload failed (${res.status})`);
                 setStatus('IDLE');
             }
-        } catch  {
+        } catch (err) {
+            setUploadError('Cannot reach the server. Make sure the API is running.');
             setStatus('IDLE');
         }
     };
@@ -585,17 +604,18 @@ function UploadPageContent() {
         if (!metadata || isCreatingJob) return;
         setIsCreatingJob(true);
         try {
+            const reqBody = {
+                fileId: metadata.fileId,
+                pageCount: metadata.pageCount,
+                copies,
+                kioskId
+            };
             const res = await fetch(`${API_BASE}/api/jobs`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    fileId: metadata.fileId,
-                    pageCount: metadata.pageCount,
-                    copies,
-                    kioskId
-                })
+                body: JSON.stringify(reqBody)
             });
             const job = await res.json();
             if (res.ok) {
@@ -604,6 +624,27 @@ function UploadPageContent() {
             }
         } catch  {} finally{
             setIsCreatingJob(false);
+        }
+    };
+    const handleWalletPayment = async ()=>{
+        if (!jobId || !token) return;
+        setStatus('VERIFYING_PAYMENT');
+        try {
+            const res = await fetch(`${API_BASE}/api/jobs/${jobId}/pay-wallet`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            if (res.ok) {
+                setStatus('SUCCESS');
+            } else {
+                setUploadError('Wallet payment failed or insufficient balance.');
+                setStatus('PAYING');
+            }
+        } catch  {
+            setUploadError('Network error');
+            setStatus('PAYING');
         }
     };
     const handleVerifyPayment = async ()=>{
@@ -631,14 +672,14 @@ function UploadPageContent() {
                 children: STYLES
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 586,
+                lineNumber: 631,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "page-bg"
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 587,
+                lineNumber: 632,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -653,14 +694,14 @@ function UploadPageContent() {
                                     className: "ring-bg"
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 591,
+                                    lineNumber: 636,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "ring-spin"
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 592,
+                                    lineNumber: 637,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -671,18 +712,18 @@ function UploadPageContent() {
                                         color: "#4fda0f"
                                     }, void 0, false, {
                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                        lineNumber: 594,
+                                        lineNumber: 639,
                                         columnNumber: 29
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 593,
+                                    lineNumber: 638,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 590,
+                            lineNumber: 635,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -690,7 +731,7 @@ function UploadPageContent() {
                             children: "Verifying Payment"
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 597,
+                            lineNumber: 642,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -698,7 +739,7 @@ function UploadPageContent() {
                             children: "Checking your NayaPay transaction. This takes a few seconds…"
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 598,
+                            lineNumber: 643,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -712,7 +753,7 @@ function UploadPageContent() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 600,
+                                    lineNumber: 645,
                                     columnNumber: 25
                                 }, this),
                                 jobId && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -723,24 +764,24 @@ function UploadPageContent() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 601,
+                                    lineNumber: 646,
                                     columnNumber: 35
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 599,
+                            lineNumber: 644,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                    lineNumber: 589,
+                    lineNumber: 634,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 588,
+                lineNumber: 633,
                 columnNumber: 13
             }, this)
         ]
@@ -752,14 +793,14 @@ function UploadPageContent() {
                 children: STYLES
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 612,
+                lineNumber: 657,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "page-bg"
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 613,
+                lineNumber: 658,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -774,7 +815,7 @@ function UploadPageContent() {
                                     className: "pending-pulse"
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 617,
+                                    lineNumber: 662,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -785,18 +826,18 @@ function UploadPageContent() {
                                         color: "#f59e0b"
                                     }, void 0, false, {
                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                        lineNumber: 619,
+                                        lineNumber: 664,
                                         columnNumber: 29
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 618,
+                                    lineNumber: 663,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 616,
+                            lineNumber: 661,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -804,7 +845,7 @@ function UploadPageContent() {
                             children: "Payment Under Review"
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 622,
+                            lineNumber: 667,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -812,7 +853,7 @@ function UploadPageContent() {
                             children: "We couldn't auto-verify your payment. Our team has been notified and is reviewing it — you'll be moved to the print queue automatically."
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 623,
+                            lineNumber: 668,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -826,7 +867,7 @@ function UploadPageContent() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 628,
+                                    lineNumber: 673,
                                     columnNumber: 25
                                 }, this),
                                 accountTitle && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -834,7 +875,7 @@ function UploadPageContent() {
                                     children: accountTitle
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 629,
+                                    lineNumber: 674,
                                     columnNumber: 42
                                 }, this),
                                 jobId && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -845,13 +886,13 @@ function UploadPageContent() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 630,
+                                    lineNumber: 675,
                                     columnNumber: 35
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 627,
+                            lineNumber: 672,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -861,14 +902,14 @@ function UploadPageContent() {
                                     className: "live-dot dot-amber"
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 633,
+                                    lineNumber: 678,
                                     columnNumber: 25
                                 }, this),
                                 "Waiting for approval — updates automatically"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 632,
+                            lineNumber: 677,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -880,24 +921,24 @@ function UploadPageContent() {
                                     children: "Do not close this screen."
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 638,
+                                    lineNumber: 683,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 636,
+                            lineNumber: 681,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                    lineNumber: 615,
+                    lineNumber: 660,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 614,
+                lineNumber: 659,
                 columnNumber: 13
             }, this)
         ]
@@ -909,14 +950,14 @@ function UploadPageContent() {
                 children: STYLES
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 649,
+                lineNumber: 694,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "page-bg"
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 650,
+                lineNumber: 695,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -931,14 +972,14 @@ function UploadPageContent() {
                                     className: "ring-bg"
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 654,
+                                    lineNumber: 699,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "ring-spin"
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 655,
+                                    lineNumber: 700,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -949,18 +990,18 @@ function UploadPageContent() {
                                         color: "#4fda0f"
                                     }, void 0, false, {
                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                        lineNumber: 657,
+                                        lineNumber: 702,
                                         columnNumber: 29
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 656,
+                                    lineNumber: 701,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 653,
+                            lineNumber: 698,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -968,7 +1009,7 @@ function UploadPageContent() {
                             children: "Payment Confirmed!"
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 660,
+                            lineNumber: 705,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -982,7 +1023,7 @@ function UploadPageContent() {
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 661,
+                            lineNumber: 706,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -996,7 +1037,7 @@ function UploadPageContent() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 666,
+                                    lineNumber: 711,
                                     columnNumber: 25
                                 }, this),
                                 jobId && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1007,13 +1048,13 @@ function UploadPageContent() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 667,
+                                    lineNumber: 712,
                                     columnNumber: 35
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 665,
+                            lineNumber: 710,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1023,25 +1064,25 @@ function UploadPageContent() {
                                     className: "live-dot dot-green"
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 670,
+                                    lineNumber: 715,
                                     columnNumber: 25
                                 }, this),
                                 "Printing in progress"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 669,
+                            lineNumber: 714,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                    lineNumber: 652,
+                    lineNumber: 697,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 651,
+                lineNumber: 696,
                 columnNumber: 13
             }, this)
         ]
@@ -1053,14 +1094,14 @@ function UploadPageContent() {
                 children: STYLES
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 682,
+                lineNumber: 727,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "page-bg"
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 683,
+                lineNumber: 728,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1076,12 +1117,12 @@ function UploadPageContent() {
                                 color: "#4fda0f"
                             }, void 0, false, {
                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                lineNumber: 687,
+                                lineNumber: 732,
                                 columnNumber: 25
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 686,
+                            lineNumber: 731,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -1089,7 +1130,7 @@ function UploadPageContent() {
                             children: "All Done!"
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 689,
+                            lineNumber: 734,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1097,7 +1138,7 @@ function UploadPageContent() {
                             children: "Your documents are ready. Please collect them from the printer."
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 690,
+                            lineNumber: 735,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1109,18 +1150,18 @@ function UploadPageContent() {
                             children: "Print Another Document"
                         }, void 0, false, {
                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                            lineNumber: 693,
+                            lineNumber: 738,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                    lineNumber: 685,
+                    lineNumber: 730,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 684,
+                lineNumber: 729,
                 columnNumber: 13
             }, this)
         ]
@@ -1132,14 +1173,14 @@ function UploadPageContent() {
                 children: STYLES
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 709,
+                lineNumber: 754,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "page-bg"
             }, void 0, false, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 710,
+                lineNumber: 755,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1154,7 +1195,7 @@ function UploadPageContent() {
                                 className: "up-logo"
                             }, void 0, false, {
                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                lineNumber: 716,
+                                lineNumber: 761,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1162,13 +1203,13 @@ function UploadPageContent() {
                                 children: kioskId
                             }, void 0, false, {
                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                lineNumber: 717,
+                                lineNumber: 762,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                        lineNumber: 714,
+                        lineNumber: 759,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1188,12 +1229,12 @@ function UploadPageContent() {
                                                 className: "animate-spin"
                                             }, void 0, false, {
                                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 729,
+                                                lineNumber: 774,
                                                 columnNumber: 41
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                            lineNumber: 728,
+                                            lineNumber: 773,
                                             columnNumber: 37
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1201,69 +1242,90 @@ function UploadPageContent() {
                                             children: "Analyzing document…"
                                         }, void 0, false, {
                                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                            lineNumber: 731,
+                                            lineNumber: 776,
                                             columnNumber: 37
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 727,
+                                    lineNumber: 772,
                                     columnNumber: 33
-                                }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                    className: "up-drop-label",
+                                }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
                                     children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "up-icon-bg",
-                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$phosphor$2d$react$2f$dist$2f$icons$2f$CloudArrowUp$2e$esm$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__CloudArrowUp$3e$__["CloudArrowUp"], {
-                                                size: 36,
-                                                color: "#3ab30a"
-                                            }, void 0, false, {
-                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 736,
-                                                columnNumber: 41
-                                            }, this)
-                                        }, void 0, false, {
-                                            fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                            lineNumber: 735,
-                                            columnNumber: 37
-                                        }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "up-tap-text",
-                                            children: "Tap to select file"
-                                        }, void 0, false, {
-                                            fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                            lineNumber: 738,
-                                            columnNumber: 37
-                                        }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "up-file-types",
-                                            children: "PDF, JPG, or PNG"
-                                        }, void 0, false, {
-                                            fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                            lineNumber: 739,
-                                            columnNumber: 37
-                                        }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                            type: "file",
-                                            onChange: handleFileChange,
+                                        uploadError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             style: {
-                                                display: 'none'
+                                                padding: '12px 16px',
+                                                marginBottom: '12px',
+                                                background: 'rgba(239,68,68,0.08)',
+                                                border: '1px solid rgba(239,68,68,0.25)',
+                                                borderRadius: '12px',
+                                                color: '#dc2626',
+                                                fontSize: '13px',
+                                                lineHeight: 1.5
                                             },
-                                            accept: ".pdf,image/*"
+                                            children: uploadError
                                         }, void 0, false, {
                                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                            lineNumber: 740,
+                                            lineNumber: 781,
+                                            columnNumber: 41
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                            className: "up-drop-label",
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "up-icon-bg",
+                                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$phosphor$2d$react$2f$dist$2f$icons$2f$CloudArrowUp$2e$esm$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__CloudArrowUp$3e$__["CloudArrowUp"], {
+                                                        size: 36,
+                                                        color: "#3ab30a"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                        lineNumber: 796,
+                                                        columnNumber: 45
+                                                    }, this)
+                                                }, void 0, false, {
+                                                    fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                    lineNumber: 795,
+                                                    columnNumber: 41
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                    className: "up-tap-text",
+                                                    children: "Tap to select file"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                    lineNumber: 798,
+                                                    columnNumber: 41
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                    className: "up-file-types",
+                                                    children: "PDF, JPG, or PNG"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                    lineNumber: 799,
+                                                    columnNumber: 41
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                    type: "file",
+                                                    onChange: handleFileChange,
+                                                    style: {
+                                                        display: 'none'
+                                                    },
+                                                    accept: ".pdf,image/*"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                    lineNumber: 800,
+                                                    columnNumber: 41
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                            lineNumber: 794,
                                             columnNumber: 37
                                         }, this)
                                     ]
-                                }, void 0, true, {
-                                    fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 734,
-                                    columnNumber: 33
-                                }, this)
+                                }, void 0, true)
                             }, void 0, false, {
                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                lineNumber: 725,
+                                lineNumber: 770,
                                 columnNumber: 25
                             }, this),
                             (status === 'CONFIGURING' || status === 'PAYING') && metadata && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
@@ -1278,12 +1340,12 @@ function UploadPageContent() {
                                                     color: "#3ab30a"
                                                 }, void 0, false, {
                                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                    lineNumber: 757,
+                                                    lineNumber: 818,
                                                     columnNumber: 37
                                                 }, this)
                                             }, void 0, false, {
                                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 756,
+                                                lineNumber: 817,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1297,7 +1359,7 @@ function UploadPageContent() {
                                                         children: file?.name
                                                     }, void 0, false, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 760,
+                                                        lineNumber: 821,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1310,19 +1372,19 @@ function UploadPageContent() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 761,
+                                                        lineNumber: 822,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 759,
+                                                lineNumber: 820,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                        lineNumber: 755,
+                                        lineNumber: 816,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1332,7 +1394,7 @@ function UploadPageContent() {
                                                 children: "Copies"
                                             }, void 0, false, {
                                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 769,
+                                                lineNumber: 830,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1345,14 +1407,14 @@ function UploadPageContent() {
                                                         children: "−"
                                                     }, void 0, false, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 771,
+                                                        lineNumber: 832,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                         className: "copies-divider"
                                                     }, void 0, false, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 778,
+                                                        lineNumber: 839,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1360,14 +1422,14 @@ function UploadPageContent() {
                                                         children: copies
                                                     }, void 0, false, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 779,
+                                                        lineNumber: 840,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                         className: "copies-divider"
                                                     }, void 0, false, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 780,
+                                                        lineNumber: 841,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1377,19 +1439,19 @@ function UploadPageContent() {
                                                         children: "+"
                                                     }, void 0, false, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 781,
+                                                        lineNumber: 842,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 770,
+                                                lineNumber: 831,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                        lineNumber: 768,
+                                        lineNumber: 829,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1402,7 +1464,7 @@ function UploadPageContent() {
                                                         children: "Total"
                                                     }, void 0, false, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 794,
+                                                        lineNumber: 855,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1413,13 +1475,13 @@ function UploadPageContent() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 795,
+                                                        lineNumber: 856,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 793,
+                                                lineNumber: 854,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1436,7 +1498,7 @@ function UploadPageContent() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 798,
+                                                        lineNumber: 859,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1448,131 +1510,204 @@ function UploadPageContent() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 799,
+                                                        lineNumber: 860,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 797,
+                                                lineNumber: 858,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                        lineNumber: 792,
+                                        lineNumber: 853,
                                         columnNumber: 29
                                     }, this),
                                     status === 'PAYING' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
                                         children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            uploadError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                style: {
+                                                    padding: '10px',
+                                                    background: '#fee2e2',
+                                                    color: '#dc2626',
+                                                    borderRadius: '12px',
+                                                    fontSize: '13px'
+                                                },
+                                                children: uploadError
+                                            }, void 0, false, {
+                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                lineNumber: 868,
+                                                columnNumber: 41
+                                            }, this),
+                                            token !== null && walletBal !== null && walletBal >= totalPrice ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                 className: "pay-box",
+                                                style: {
+                                                    borderColor: '#4fda0f'
+                                                },
                                                 children: [
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                         className: "pay-heading",
+                                                        children: "Instant Wallet Payment"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                        lineNumber: 875,
+                                                        columnNumber: 45
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "pay-row",
                                                         children: [
-                                                            "Transfer exactly PKR ",
-                                                            totalPrice,
-                                                            " to:"
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                className: "pay-row-label",
+                                                                children: "Available Balance"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                lineNumber: 877,
+                                                                columnNumber: 49
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                className: "pay-row-val",
+                                                                children: [
+                                                                    "PKR ",
+                                                                    walletBal
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                lineNumber: 878,
+                                                                columnNumber: 49
+                                                            }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 807,
-                                                        columnNumber: 41
+                                                        lineNumber: 876,
+                                                        columnNumber: 45
                                                     }, this),
-                                                    [
-                                                        [
-                                                            'Account',
-                                                            'Ayesha Awais'
-                                                        ],
-                                                        [
-                                                            'NayaPay #',
-                                                            '03234563464'
-                                                        ],
-                                                        [
-                                                            'ID',
-                                                            'ayesha.624@nayapay'
-                                                        ],
-                                                        [
-                                                            'IBAN',
-                                                            'PK26NAYA1234503234563464'
-                                                        ]
-                                                    ].map(([label, value])=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                            className: "pay-row",
-                                                            children: [
-                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                    className: "pay-row-label",
-                                                                    children: label
-                                                                }, void 0, false, {
-                                                                    fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                                    lineNumber: 817,
-                                                                    columnNumber: 49
-                                                                }, this),
-                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                                    className: "pay-row-val",
-                                                                    children: value
-                                                                }, void 0, false, {
-                                                                    fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                                    lineNumber: 818,
-                                                                    columnNumber: 49
-                                                                }, this)
-                                                            ]
-                                                        }, label, true, {
-                                                            fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                            lineNumber: 816,
-                                                            columnNumber: 45
-                                                        }, this)),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                         className: "pay-note",
-                                                        children: "Send the exact amount to enable auto-verification."
+                                                        children: "You have enough funds. Pay instantly below."
                                                     }, void 0, false, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 821,
-                                                        columnNumber: 41
+                                                        lineNumber: 880,
+                                                        columnNumber: 45
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 806,
-                                                columnNumber: 37
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                lineNumber: 874,
+                                                columnNumber: 41
+                                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
                                                 children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                                        className: "input-label",
-                                                        children: "Your NayaPay Account Title"
-                                                    }, void 0, false, {
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        className: "pay-box",
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                className: "pay-heading",
+                                                                children: [
+                                                                    "Transfer exactly PKR ",
+                                                                    totalPrice,
+                                                                    " to:"
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                lineNumber: 885,
+                                                                columnNumber: 49
+                                                            }, this),
+                                                            [
+                                                                [
+                                                                    'Account',
+                                                                    'Ayesha Awais'
+                                                                ],
+                                                                [
+                                                                    'NayaPay #',
+                                                                    '03234563464'
+                                                                ],
+                                                                [
+                                                                    'ID',
+                                                                    'ayesha.624@nayapay'
+                                                                ],
+                                                                [
+                                                                    'IBAN',
+                                                                    'PK26NAYA1234503234563464'
+                                                                ]
+                                                            ].map(([label, value])=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                    className: "pay-row",
+                                                                    children: [
+                                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                            className: "pay-row-label",
+                                                                            children: label
+                                                                        }, void 0, false, {
+                                                                            fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                            lineNumber: 895,
+                                                                            columnNumber: 57
+                                                                        }, this),
+                                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                            className: "pay-row-val",
+                                                                            children: value
+                                                                        }, void 0, false, {
+                                                                            fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                            lineNumber: 896,
+                                                                            columnNumber: 57
+                                                                        }, this)
+                                                                    ]
+                                                                }, label, true, {
+                                                                    fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                    lineNumber: 894,
+                                                                    columnNumber: 53
+                                                                }, this)),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                className: "pay-note",
+                                                                children: "Send the exact amount to enable auto-verification."
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                lineNumber: 899,
+                                                                columnNumber: 49
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 827,
-                                                        columnNumber: 41
+                                                        lineNumber: 884,
+                                                        columnNumber: 45
                                                     }, this),
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                                        type: "text",
-                                                        className: "account-input",
-                                                        placeholder: "e.g. Muhammad Ali",
-                                                        value: accountTitle,
-                                                        onChange: (e)=>setAccountTitle(e.target.value),
-                                                        autoComplete: "off",
-                                                        autoCorrect: "off"
-                                                    }, void 0, false, {
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                        children: [
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                                className: "input-label",
+                                                                children: "Your NayaPay Account Title"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                lineNumber: 905,
+                                                                columnNumber: 49
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                type: "text",
+                                                                className: "account-input",
+                                                                placeholder: "e.g. Muhammad Ali",
+                                                                value: accountTitle,
+                                                                onChange: (e)=>setAccountTitle(e.target.value),
+                                                                autoComplete: "off",
+                                                                autoCorrect: "off"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                lineNumber: 908,
+                                                                columnNumber: 49
+                                                            }, this),
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                className: "input-hint",
+                                                                children: "Must match the name shown in your NayaPay account exactly."
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                                                lineNumber: 917,
+                                                                columnNumber: 49
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
                                                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 830,
-                                                        columnNumber: 41
-                                                    }, this),
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                        className: "input-hint",
-                                                        children: "Must match the name shown in your NayaPay account exactly."
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                        lineNumber: 839,
-                                                        columnNumber: 41
+                                                        lineNumber: 904,
+                                                        columnNumber: 45
                                                     }, this)
                                                 ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                                lineNumber: 826,
-                                                columnNumber: 37
-                                            }, this)
+                                            }, void 0, true)
                                         ]
                                     }, void 0, true)
                                 ]
@@ -1581,13 +1716,13 @@ function UploadPageContent() {
                                 className: "scroll-spacer"
                             }, void 0, false, {
                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                lineNumber: 848,
+                                lineNumber: 928,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                        lineNumber: 721,
+                        lineNumber: 766,
                         columnNumber: 17
                     }, this),
                     (status === 'CONFIGURING' || status === 'PAYING') && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1604,7 +1739,7 @@ function UploadPageContent() {
                                             className: "animate-spin"
                                         }, void 0, false, {
                                             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                            lineNumber: 861,
+                                            lineNumber: 941,
                                             columnNumber: 41
                                         }, this),
                                         "  Processing…"
@@ -1614,34 +1749,46 @@ function UploadPageContent() {
                                     children: "Proceed to Payment"
                                 }, void 0, false, {
                                     fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                    lineNumber: 862,
+                                    lineNumber: 942,
                                     columnNumber: 39
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                lineNumber: 855,
+                                lineNumber: 935,
                                 columnNumber: 29
                             }, this),
-                            status === 'PAYING' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                            status === 'PAYING' && (token !== null && walletBal !== null && walletBal >= totalPrice ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                className: "btn-dark-green",
+                                onClick: handleWalletPayment,
+                                children: [
+                                    "Pay PKR ",
+                                    totalPrice,
+                                    " Instantly"
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/apps/web/src/app/upload/page.tsx",
+                                lineNumber: 948,
+                                columnNumber: 33
+                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                 className: "btn-dark-green",
                                 onClick: handleVerifyPayment,
                                 disabled: !accountTitle.trim(),
                                 children: "I Have Paid"
                             }, void 0, false, {
                                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                                lineNumber: 867,
-                                columnNumber: 29
-                            }, this)
+                                lineNumber: 955,
+                                columnNumber: 33
+                            }, this))
                         ]
                     }, void 0, true, {
                         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                        lineNumber: 853,
+                        lineNumber: 933,
                         columnNumber: 21
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/apps/web/src/app/upload/page.tsx",
-                lineNumber: 711,
+                lineNumber: 756,
                 columnNumber: 13
             }, this)
         ]
@@ -1656,17 +1803,17 @@ function UploadPage() {
             }
         }, void 0, false, {
             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-            lineNumber: 884,
+            lineNumber: 973,
             columnNumber: 29
         }, void 0),
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(UploadPageContent, {}, void 0, false, {
             fileName: "[project]/apps/web/src/app/upload/page.tsx",
-            lineNumber: 885,
+            lineNumber: 974,
             columnNumber: 13
         }, this)
     }, void 0, false, {
         fileName: "[project]/apps/web/src/app/upload/page.tsx",
-        lineNumber: 884,
+        lineNumber: 973,
         columnNumber: 9
     }, this);
 }
