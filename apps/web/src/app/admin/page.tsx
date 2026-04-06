@@ -124,6 +124,13 @@ export default function AdminDashboard() {
         fetchJobs();
         fetchVideos();
         fetchTopUps();
+
+        const interval = setInterval(() => {
+            fetchJobs();
+            fetchTopUps();
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const pendingJobs = jobs.filter(j => j.status === 'PENDING');

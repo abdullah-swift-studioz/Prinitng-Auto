@@ -241,7 +241,7 @@ function HomeContent() {
             <div className="home-root">
                 <div className="home-header">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo.jpeg" alt="Print It" className="home-logo" />
+                    <img src="/logo.svg" alt="Print It" className="home-logo" />
                     {token && (
                         <button className="logout-btn" onClick={handleLogout}>Log Out</button>
                     )}

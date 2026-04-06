@@ -70,10 +70,28 @@
       "namedRegex": "^/kiosk\\-print(?:/)?$"
     },
     {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/signup",
+      "regex": "^/signup(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/signup(?:/)?$"
+    },
+    {
       "page": "/upload",
       "regex": "^/upload(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/upload(?:/)?$"
+    },
+    {
+      "page": "/wallet",
+      "regex": "^/wallet(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/wallet(?:/)?$"
     }
   ],
   "dataRoutes": [],

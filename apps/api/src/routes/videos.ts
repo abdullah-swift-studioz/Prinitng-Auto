@@ -21,10 +21,13 @@ const videoStorage = multer.diskStorage({
 const upload = multer({
     storage: videoStorage,
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('video/')) {
+        const ext = path.extname(file.originalname).toLowerCase();
+        const allowedExts = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
+        
+        if (file.mimetype.startsWith('video/') || allowedExts.includes(ext)) {
             cb(null, true);
         } else {
-            cb(new Error('Only video files are allowed') as any, false);
+            cb(new Error(`Only video files are allowed. Got mimetype: ${file.mimetype}`) as any, false);
         }
     },
 });

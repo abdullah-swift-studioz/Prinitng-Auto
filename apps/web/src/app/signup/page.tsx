@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function SignUp() {
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
+function SignUpContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const kioskId = searchParams.get('kiosk_id') || 'default';
@@ -19,7 +21,7 @@ export default function SignUp() {
         setError('');
 
         try {
-            const res = await fetch('http://localhost:3001/api/auth/register', {
+            const res = await fetch(`${API_BASE}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -199,5 +201,14 @@ export default function SignUp() {
                 </div>
             </div>
         </>
+    );
+}
+
+
+export default function SignUp() {
+    return (
+        <Suspense fallback={<div style={{ height: '100svh', background: '#ffffff' }} />}>
+            <SignUpContent />
+        </Suspense>
     );
 }

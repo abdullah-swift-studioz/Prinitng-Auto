@@ -755,7 +755,7 @@ function KioskDisplayContent() {
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 className: "brand",
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                    src: "/logo.jpeg",
+                                    src: "/logo.svg",
                                     alt: "Print It Logo",
                                     className: "brand-logo"
                                 }, void 0, false, {
@@ -1212,7 +1212,7 @@ _s(KioskDisplayContent, "qEshdXRLNt/bQC8UVaJ34LdWsG8=", false, function() {
     ];
 });
 _c = KioskDisplayContent;
-function KioskDisplayPage() {
+function KioskDisplayPageContent() {
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Suspense"], {
         fallback: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             style: {
@@ -1243,10 +1243,35 @@ function KioskDisplayPage() {
         columnNumber: 9
     }, this);
 }
-_c1 = KioskDisplayPage;
-var _c, _c1;
+_c1 = KioskDisplayPageContent;
+function KioskDisplayPage() {
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Suspense"], {
+        fallback: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            style: {
+                height: '100svh',
+                background: '#ffffff'
+            }
+        }, void 0, false, {
+            fileName: "[project]/apps/web/src/app/kiosk-display/page.tsx",
+            lineNumber: 748,
+            columnNumber: 29
+        }, void 0),
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(KioskDisplayPageContent, {}, void 0, false, {
+            fileName: "[project]/apps/web/src/app/kiosk-display/page.tsx",
+            lineNumber: 749,
+            columnNumber: 13
+        }, this)
+    }, void 0, false, {
+        fileName: "[project]/apps/web/src/app/kiosk-display/page.tsx",
+        lineNumber: 748,
+        columnNumber: 9
+    }, this);
+}
+_c2 = KioskDisplayPage;
+var _c, _c1, _c2;
 __turbopack_context__.k.register(_c, "KioskDisplayContent");
-__turbopack_context__.k.register(_c1, "KioskDisplayPage");
+__turbopack_context__.k.register(_c1, "KioskDisplayPageContent");
+__turbopack_context__.k.register(_c2, "KioskDisplayPage");
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(__turbopack_context__.m, globalThis.$RefreshHelpers$);
 }

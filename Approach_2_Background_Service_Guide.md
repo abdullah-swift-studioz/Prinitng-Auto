@@ -25,12 +25,12 @@ On the Windows 10 kiosk machine:
 ### Step 3: Connect to AWS
 The kiosk client needs to know where to find your server.
 1.  Inside the `apps/kiosk` folder, create a new file named `.env`.
-2.  Add your API location and specific Kiosk Identifier to this file:
+2.  Add your API location and assign a Kiosk Identifier to this machine:
     ```env
-    API_URL=https://api.YOUR-AWS-URL.com/api
-    KIOSK_ID=YOUR_UNIQUE_KIOSK_ID
+    API_URL=https://printit.fixerr.ai/api
+    KIOSK_ID=main-printer
     ```
-    *(Note: `KIOSK_ID` must precisely match the ID you set up in your admin panel.)*
+    *(Note: `KIOSK_ID` can be any basic name you invent (like `kiosk-1` or `main-printer`). Just remember: this exact ID must be used in the link on the physical QR code users scan!)*
 
 ### Step 4: Automate the Background Service
 You want this client running constantly, even if the machine restarts. We will use PM2, an industry-standard process manager.
@@ -58,7 +58,7 @@ You want this client running constantly, even if the machine restarts. We will u
 ### Step 5: Screen Setup
 The printing backend is now permanently active. To handle the visual portion:
 1.  Open the web browser on the Windows kiosk.
-2.  Navigate to your AWS frontend, specifically the display view: `https://YOUR-AWS-WEB-URL.com/kiosk-display?kiosk_id=YOUR_UNIQUE_KIOSK_ID`
+2.  Navigate to your AWS frontend, specifically the display view: `https://printit.fixerr.ai/kiosk-display?kiosk_id=main-printer`
 3.  Press `F11` (or use a browser locking tool) to lock the screen into place.
 
 Whenever a job enters the AWS system, the invisible PM2 script will download the PDF and securely print it—all without the Next.js screen ever changing.

@@ -23,6 +23,22 @@ if [[ "$TARGET" == "api" || "$TARGET" == "all" ]]; then
       "$PROJECT_LOCAL/apps/api/dist/" \
       "$REMOTE_HOST:$REMOTE_PATH/apps/api/dist/"
 
+    echo "==> Syncing API config and Prisma schema to server..."
+    rsync -avz \
+      -e "$RSYNC_SSH" \
+      "$PROJECT_LOCAL/apps/api/package.json" \
+      "$REMOTE_HOST:$REMOTE_PATH/apps/api/"
+
+    rsync -avz \
+      --exclude 'dev.db' \
+      --exclude 'dev.db-journal' \
+      -e "$RSYNC_SSH" \
+      "$PROJECT_LOCAL/apps/api/prisma/" \
+      "$REMOTE_HOST:$REMOTE_PATH/apps/api/prisma/"
+
+    echo "==> Installing API dependencies and migrating Database..."
+    $SSH $REMOTE_HOST "cd $REMOTE_PATH/apps/api && npm install && npx prisma generate && npx prisma db push"
+
     echo "==> Restarting printit-api..."
     $SSH $REMOTE_HOST "pm2 restart printit-api"
 fi
@@ -43,6 +59,12 @@ if [[ "$TARGET" == "web" || "$TARGET" == "all" ]]; then
       -e "$RSYNC_SSH" \
       "$PROJECT_LOCAL/apps/web/next.config.js" \
       "$REMOTE_HOST:$REMOTE_PATH/apps/web/next.config.js"
+
+    echo "==> Syncing public/ to server..."
+    rsync -avz \
+      -e "$RSYNC_SSH" \
+      "$PROJECT_LOCAL/apps/web/public/" \
+      "$REMOTE_HOST:$REMOTE_PATH/apps/web/public/"
 
     echo "==> Restarting printit-web..."
     $SSH $REMOTE_HOST "pm2 restart printit-web"

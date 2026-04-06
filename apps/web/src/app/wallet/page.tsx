@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function Wallet() {
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
+function WalletContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const kioskId = searchParams.get('kiosk_id') || 'default';
@@ -31,7 +33,7 @@ export default function Wallet() {
 
     const fetchWalletData = async (t: string) => {
         try {
-            const res = await fetch('http://localhost:3001/api/wallet/balance', {
+            const res = await fetch(`${API_BASE}/api/wallet/balance`, {
                 headers: { 'Authorization': `Bearer ${t}` }
             });
             const data = await res.json();
@@ -53,7 +55,7 @@ export default function Wallet() {
         setReqSuccess(false);
 
         try {
-            const res = await fetch('http://localhost:3001/api/wallet/request-topup', {
+            const res = await fetch(`${API_BASE}/api/wallet/request-topup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -245,6 +247,31 @@ export default function Wallet() {
                         <p style={{fontSize: '14px', color: '#666', lineHeight: 1.4}}>
                             Transfer funds via NayaPay and submit the request here. Admin will approve it shortly.
                         </p>
+
+                        <div style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            padding: '16px',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            marginTop: '8px'
+                        }}>
+                            <div style={{ fontSize: '12px', textTransform: 'uppercase', fontStyle: 'italic', letterSpacing: '1px', color: '#64748b' }}>
+                                Transfer To:
+                            </div>
+                            {[
+                                ['Account', 'Ayesha Awais'],
+                                ['NayaPay #', '03234563464'],
+                                ['ID', 'ayesha.624@nayapay'],
+                            ].map(([label, value]) => (
+                                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}>{label}</span>
+                                    <span style={{ fontSize: '15px', color: '#0f172a', fontWeight: 600 }}>{value}</span>
+                                </div>
+                            ))}
+                        </div>
                         
                         <input
                             type="number"
@@ -289,5 +316,14 @@ export default function Wallet() {
                 </div>
             </div>
         </>
+    );
+}
+
+
+export default function Wallet() {
+    return (
+        <Suspense fallback={<div style={{ height: '100svh', background: '#ffffff' }} />}>
+            <WalletContent />
+        </Suspense>
     );
 }

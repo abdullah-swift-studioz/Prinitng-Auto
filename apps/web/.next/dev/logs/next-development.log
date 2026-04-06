@@ -180,3 +180,6 @@ Import traces:
 [01:42:15.152] Browser ERROR   uncaughtError: ReferenceError: topUps is not defined
 [01:42:15.236] Server  LOG     ✓ Compiled in 34ms
 [01:42:15.363] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:50:38.300] Server  LOG     ✓ Compiled in 60ms
+[02:07:30.267] Server  LOG     ✓ Compiled in 64ms
+[02:54:16.974] Server  LOG     ✓ Compiled in 39ms

@@ -637,7 +637,7 @@ function KioskDisplayContent() {
                     {/* Brand */}
                     <div className="brand">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/logo.jpeg" alt="Print It Logo" className="brand-logo" />
+                        <img src="/logo.svg" alt="Print It Logo" className="brand-logo" />
                     </div>
 
                     {/* Headline */}
@@ -730,7 +730,7 @@ function KioskDisplayContent() {
     );
 }
 
-export default function KioskDisplayPage() {
+function KioskDisplayPageContent() {
     return (
         <Suspense fallback={
             <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff', color: '#3ab30a', fontFamily: 'monospace', letterSpacing: '4px', fontSize: '14px' }}>
@@ -738,6 +738,15 @@ export default function KioskDisplayPage() {
             </div>
         }>
             <KioskDisplayContent />
+        </Suspense>
+    );
+}
+
+
+export default function KioskDisplayPage() {
+    return (
+        <Suspense fallback={<div style={{ height: '100svh', background: '#ffffff' }} />}>
+            <KioskDisplayPageContent />
         </Suspense>
     );
 }

@@ -758,7 +758,7 @@ function UploadPageContent() {
                 {/* Fixed header */}
                 <header className="up-header">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo.jpeg" alt="Print It" className="up-logo" />
+                    <img src="/logo.svg" alt="Print It" className="up-logo" />
                     <span className="up-kiosk-id">{kioskId}</span>
                 </header>
 

@@ -4,6 +4,9 @@
   "/admin/page": "/admin",
   "/kiosk-display/page": "/kiosk-display",
   "/kiosk-print/page": "/kiosk-print",
+  "/login/page": "/login",
   "/page": "/",
-  "/upload/page": "/upload"
+  "/signup/page": "/signup",
+  "/upload/page": "/upload",
+  "/wallet/page": "/wallet"
 }

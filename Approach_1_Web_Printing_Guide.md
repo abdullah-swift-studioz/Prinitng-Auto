@@ -14,10 +14,11 @@ By default, `window.print()` will trigger a print dialog requiring a user to man
 1.  On the Windows 10 desktop, right-click and select **New > Shortcut**.
 2.  In the location box, enter the path to Google Chrome followed by the required flags and your AWS URL. It should look exactly like this (ensure you include the quotes exactly as shown):
     ```text
-    "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --kiosk-printing "https://YOUR-AWS-WEB-URL.com/kiosk-display?kiosk_id=YOUR_KIOSK_ID"
+    "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --kiosk-printing "https://printit.fixerr.ai/kiosk-display?kiosk_id=main-printer"
     ```
     *   `--kiosk`: Locks Chrome into full-screen mode without an address bar.
     *   `--kiosk-printing`: Instructs Chrome to automatically hit "Print" on any system print dialogs that pop up.
+    *   `kiosk_id=main-printer`: This assigns a unique name to this specific machine. You can invent any name (e.g., `fast-kiosk-1`, `library-printer`). Just ensure the physical QR code users scan matches this exact ID!
 3.  Name the shortcut something like "Start Printing Kiosk".
 
 ## Step 2: System Boot Configuration (Optional but Recommended)

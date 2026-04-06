@@ -4,6 +4,9 @@
   "/admin/page": "app/admin/page.js",
   "/kiosk-display/page": "app/kiosk-display/page.js",
   "/kiosk-print/page": "app/kiosk-print/page.js",
+  "/login/page": "app/login/page.js",
   "/page": "app/page.js",
-  "/upload/page": "app/upload/page.js"
+  "/signup/page": "app/signup/page.js",
+  "/upload/page": "app/upload/page.js",
+  "/wallet/page": "app/wallet/page.js"
 }

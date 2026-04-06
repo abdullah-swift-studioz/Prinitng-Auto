@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function Login() {
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
+function LoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const kioskId = searchParams.get('kiosk_id') || 'default';
@@ -19,7 +21,7 @@ export default function Login() {
         setError('');
 
         try {
-            const res = await fetch('http://localhost:3001/api/auth/login', {
+            const res = await fetch(`${API_BASE}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -199,5 +201,14 @@ export default function Login() {
                 </div>
             </div>
         </>
+    );
+}
+
+
+export default function Login() {
+    return (
+        <Suspense fallback={<div style={{ height: '100svh', background: '#ffffff' }} />}>
+            <LoginContent />
+        </Suspense>
     );
 }
