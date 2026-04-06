@@ -1,0 +1,173 @@
+[00:00:01.214] Server  LOG     ✓ Ready in 1009ms
+[00:00:25.893] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:26.150] Server  ERROR   (node:41401) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[00:00:31.223] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:36.788] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:06:47.559] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:06:49.303] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:08:57.566] Server  LOG     ✓ Compiled in 73ms
+[00:10:47.839] Server  LOG     ✓ Compiled in 43ms
+[00:10:52.846] Server  LOG     ✓ Compiled in 20ms
+[00:11:17.915] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:14:24.395] Server  LOG     ✓ Compiled in 29ms
+[00:14:27.513] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:14:29.011] Server  LOG     ✓ Compiled in 25ms
+[00:14:34.115] Server  LOG     ✓ Compiled in 16ms
+[00:25:03.922] Server  LOG     ✓ Compiled in 67ms
+[00:25:16.792] Server  LOG     ✓ Compiled in 17ms
+[00:25:19.709] Server  LOG     ✓ Compiled in 14ms
+[00:25:35.793] Server  LOG     ✓ Compiled in 1562ms
+[00:25:36.170] Browser ERROR   ./apps/web/src/app/admin/page.tsx:4:1
+Export Video doesn't exist in target module
+  2 |
+  3 | import { useEffect, useState, useRef } from 'react';
+> 4 | import { Printer, ArrowsClockwise, CurrencyDollar, FileText, CheckCircle, Clock, Warning, Video, Trash, UploadSimple } from 'phosphor-react';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 |
+  6 | const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  7 |
+
+The export Video was not found in module [project]/node_modules/phosphor-react/dist/index.esm.js [app-client] (ecmascript).
+Did you mean to import VideoCamera?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./apps/web/src/app/admin/page.tsx [Client Component Browser]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./apps/web/src/app/admin/page.tsx [Client Component SSR]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+[00:25:36.170] Browser ERROR   ./apps/web/src/app/admin/page.tsx:4:1
+Export Video doesn't exist in target module
+  2 |
+  3 | import { useEffect, useState, useRef } from 'react';
+> 4 | import { Printer, ArrowsClockwise, CurrencyDollar, FileText, CheckCircle, Clock, Warning, Video, Trash, UploadSimple } from 'phosphor-react';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 |
+  6 | const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  7 |
+
+The export Video was not found in module [project]/node_modules/phosphor-react/dist/index.esm.js [app-ssr] (ecmascript).
+Did you mean to import VideoCamera?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./apps/web/src/app/admin/page.tsx [Client Component Browser]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./apps/web/src/app/admin/page.tsx [Client Component SSR]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+[00:25:36.170] Browser ERROR   ./apps/web/src/app/admin/page.tsx:4:1
+Export Video doesn't exist in target module
+  2 |
+  3 | import { useEffect, useState, useRef } from 'react';
+> 4 | import { Printer, ArrowsClockwise, CurrencyDollar, FileText, CheckCircle, Clock, Warning, Video, Trash, UploadSimple } from 'phosphor-react';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 |
+  6 | const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  7 |
+
+The export Video was not found in module [project]/node_modules/phosphor-react/dist/index.esm.js [app-client] (ecmascript).
+Did you mean to import VideoCamera?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./apps/web/src/app/admin/page.tsx [Client Component Browser]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./apps/web/src/app/admin/page.tsx [Client Component SSR]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+[00:25:36.170] Browser ERROR   ./apps/web/src/app/admin/page.tsx:4:1
+Export Video doesn't exist in target module
+  2 |
+  3 | import { useEffect, useState, useRef } from 'react';
+> 4 | import { Printer, ArrowsClockwise, CurrencyDollar, FileText, CheckCircle, Clock, Warning, Video, Trash, UploadSimple } from 'phosphor-react';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 |
+  6 | const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  7 |
+
+The export Video was not found in module [project]/node_modules/phosphor-react/dist/index.esm.js [app-ssr] (ecmascript).
+Did you mean to import VideoCamera?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./apps/web/src/app/admin/page.tsx [Client Component Browser]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./apps/web/src/app/admin/page.tsx [Client Component SSR]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+[00:25:36.171] Browser ERROR   ./apps/web/src/app/admin/page.tsx:4:1
+Export Video doesn't exist in target module
+  2 |
+  3 | import { useEffect, useState, useRef } from 'react';
+> 4 | import { Printer, ArrowsClockwise, CurrencyDollar, FileText, CheckCircle, Clock, Warning, Video, Trash, UploadSimple } from 'phosphor-react';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 |
+  6 | const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  7 |
+
+The export Video was not found in module [project]/node_modules/phosphor-react/dist/index.esm.js [app-client] (ecmascript).
+Did you mean to import VideoCamera?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./apps/web/src/app/admin/page.tsx [Client Component Browser]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./apps/web/src/app/admin/page.tsx [Client Component SSR]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+[00:25:36.171] Browser ERROR   ./apps/web/src/app/admin/page.tsx:4:1
+Export Video doesn't exist in target module
+  2 |
+  3 | import { useEffect, useState, useRef } from 'react';
+> 4 | import { Printer, ArrowsClockwise, CurrencyDollar, FileText, CheckCircle, Clock, Warning, Video, Trash, UploadSimple } from 'phosphor-react';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 |
+  6 | const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  7 |
+
+The export Video was not found in module [project]/node_modules/phosphor-react/dist/index.esm.js [app-ssr] (ecmascript).
+Did you mean to import VideoCamera?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./apps/web/src/app/admin/page.tsx [Client Component Browser]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./apps/web/src/app/admin/page.tsx [Client Component SSR]
+    ./apps/web/src/app/admin/page.tsx [Server Component]
+[00:25:54.284] Server  LOG     ✓ Compiled in 47ms
+[00:25:55.171] Browser ERROR   uncaughtError: ReferenceError: Video is not defined
+[00:25:57.689] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:25:57.712] Server  LOG     ✓ Compiled in 33ms
+[00:25:57.812] Server  ERROR   ⨯ ReferenceError: Video is not defined
+[00:25:57.924] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:25:58.181] Browser ERROR   uncaughtError: ReferenceError: Video is not defined
+[00:26:00.990] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:26:01.069] Server  LOG     ✓ Compiled in 21ms
+[00:26:01.151] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:26:24.027] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:26:40.073] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:29:09.030] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:30:28.329] Server  LOG     ✓ Compiled in 44ms
+[00:30:33.069] Server  LOG     ✓ Compiled in 18ms
+[00:50:37.672] Server  LOG     ✓ Compiled in 68ms
+[00:54:00.873] Server  LOG     ✓ Compiled in 53ms
+[00:54:37.216] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:56:25.262] Server  LOG     ✓ Compiled in 34ms
+[00:59:56.770] Server  LOG     ✓ Compiled in 45ms
+[01:01:22.255] Server  LOG     ✓ Compiled in 40ms

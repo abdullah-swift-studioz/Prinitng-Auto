@@ -1,10 +1,503 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { CloudArrowUp, FilePdf, Image as ImageIcon, CheckCircle, Spinner, Printer } from 'phosphor-react';
+import { CloudArrowUp, FilePdf, CheckCircle, Spinner, Printer, Clock } from 'phosphor-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const PRICE_PER_PAGE_PKR = 10;
+
+type Status =
+    | 'IDLE'
+    | 'UPLOADING'
+    | 'CONFIGURING'
+    | 'PAYING'
+    | 'VERIFYING_PAYMENT'
+    | 'AWAITING_ADMIN'
+    | 'SUCCESS'
+    | 'COMPLETED';
+
+const STYLES = `
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700;800&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    /* ─── shared grid bg ─────────────────────────────────────────────────────── */
+    .page-bg {
+        position: fixed; inset: 0;
+        background: #ffffff;
+        z-index: -1;
+    }
+    .page-bg::after {
+        content: '';
+        position: absolute; inset: 0;
+        background-image:
+            linear-gradient(rgba(79,218,15,0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(79,218,15,0.07) 1px, transparent 1px);
+        background-size: 32px 32px;
+    }
+
+    /* ─── full-screen status pages ───────────────────────────────────────────── */
+    .fs-shell {
+        height: 100svh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 28px;
+        font-family: 'Barlow', sans-serif;
+        position: relative;
+        gap: 0;
+    }
+    .fs-inner {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 22px;
+    }
+    .fs-headline {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: clamp(36px, 10vw, 52px);
+        letter-spacing: 2px;
+        color: #3f4247;
+        text-align: center;
+        line-height: 1;
+    }
+    .fs-body {
+        font-size: 15px;
+        font-weight: 300;
+        color: rgba(63,66,71,0.52);
+        text-align: center;
+        line-height: 1.65;
+        width: 100%;
+    }
+    .fs-card {
+        width: 100%;
+        padding: 22px 24px;
+        border: 1px solid rgba(63,66,71,0.1);
+        border-radius: 18px;
+        text-align: center;
+        background: rgba(79,218,15,0.03);
+        box-shadow: 0 0 0 1px rgba(79,218,15,0.1), 0 2px 16px rgba(63,66,71,0.05);
+    }
+    .fs-price {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: clamp(42px, 12vw, 60px);
+        letter-spacing: 2px;
+        color: #3f4247;
+        line-height: 1;
+    }
+    .fs-job-id {
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 11px; letter-spacing: 4px;
+        text-transform: uppercase;
+        color: rgba(63,66,71,0.28);
+        margin-top: 8px;
+    }
+    .fs-account {
+        font-size: 14px; color: rgba(63,66,71,0.45); margin-top: 4px;
+    }
+
+    /* spinner ring */
+    .ring-wrap {
+        position: relative;
+        width: 100px; height: 100px;
+        flex-shrink: 0;
+    }
+    .ring-bg {
+        position: absolute; inset: 0; border-radius: 50%;
+        border: 3px solid rgba(79,218,15,0.15);
+    }
+    .ring-spin {
+        position: absolute; inset: 0; border-radius: 50%;
+        border: 3px solid #4fda0f;
+        border-top-color: transparent;
+        animation: do-spin 0.9s linear infinite;
+    }
+    @keyframes do-spin { to { transform: rotate(360deg); } }
+    .ring-center {
+        position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+    }
+
+    /* pending ring */
+    .pending-wrap {
+        position: relative;
+        width: 100px; height: 100px;
+        flex-shrink: 0;
+    }
+    .pending-pulse {
+        position: absolute; inset: 0; border-radius: 50%;
+        background: rgba(245,158,11,0.1);
+        animation: do-ping 2.5s ease-out infinite;
+    }
+    @keyframes do-ping {
+        0% { transform: scale(1); opacity: 0.7; }
+        100% { transform: scale(1.5); opacity: 0; }
+    }
+    .pending-border {
+        position: absolute; inset: 0; border-radius: 50%;
+        border: 2px solid rgba(245,158,11,0.35);
+        display: flex; align-items: center; justify-content: center;
+    }
+
+    /* completed icon */
+    .done-icon {
+        width: 100px; height: 100px; border-radius: 50%;
+        background: rgba(79,218,15,0.08);
+        border: 2px solid rgba(79,218,15,0.3);
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+    }
+
+    /* live row */
+    .live-row {
+        display: flex; align-items: center; gap: 8px;
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 13px; letter-spacing: 0.5px;
+        color: rgba(63,66,71,0.5);
+    }
+    .live-dot {
+        width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .dot-green {
+        background: #4fda0f;
+        animation: glow 2s ease-in-out infinite;
+        box-shadow: 0 0 8px rgba(79,218,15,0.6);
+    }
+    @keyframes glow {
+        0%, 100% { box-shadow: 0 0 8px rgba(79,218,15,0.6); }
+        50% { box-shadow: 0 0 20px rgba(79,218,15,0.9); }
+    }
+    .dot-amber {
+        background: #f59e0b;
+        animation: amber-pulse 2s ease-in-out infinite;
+    }
+    @keyframes amber-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    .wait-note {
+        font-size: 12px; color: rgba(63,66,71,0.32);
+        text-align: center; line-height: 1.65; width: 100%;
+    }
+    .wait-note strong { color: rgba(63,66,71,0.48); }
+
+    /* ─── main upload / configure / pay shell ────────────────────────────────── */
+    .up-shell {
+        height: 100svh;
+        display: flex;
+        flex-direction: column;
+        font-family: 'Barlow', sans-serif;
+        position: relative;
+    }
+
+    /* fixed header */
+    .up-header {
+        flex-shrink: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 44px 24px 16px;
+        border-bottom: 1px solid rgba(63,66,71,0.08);
+        background: rgba(255,255,255,0.92);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        position: relative;
+        z-index: 10;
+    }
+    .up-logo { width: 86px; height: auto; object-fit: contain; display: block; }
+    .up-kiosk-id {
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 11px; letter-spacing: 4px;
+        text-transform: uppercase;
+        color: rgba(63,66,71,0.38);
+        padding: 5px 14px;
+        border: 1px solid rgba(63,66,71,0.14);
+        border-radius: 20px;
+    }
+
+    /* scrollable content */
+    .up-body {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 24px 24px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    /* upload zone — fills height when IDLE */
+    .up-zone-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+    }
+    .up-drop-label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        flex: 1;
+        min-height: 280px;
+        border: 2px dashed rgba(79,218,15,0.32);
+        border-radius: 20px;
+        cursor: pointer;
+        padding: 40px 24px;
+        transition: border-color 0.18s, background 0.18s;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .up-drop-label:active {
+        border-color: #4fda0f;
+        background: rgba(79,218,15,0.04);
+    }
+    .up-icon-bg {
+        width: 72px; height: 72px;
+        border-radius: 20px;
+        background: rgba(79,218,15,0.1);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .up-tap-text {
+        font-size: 18px; font-weight: 600; color: #3f4247; text-align: center;
+    }
+    .up-file-types {
+        font-size: 14px; color: rgba(63,66,71,0.4); text-align: center;
+    }
+
+    .up-uploading {
+        flex: 1; min-height: 280px;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 16px;
+    }
+    .up-spinner-bg {
+        width: 72px; height: 72px; border-radius: 50%;
+        background: rgba(79,218,15,0.08);
+        border: 1px solid rgba(79,218,15,0.2);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .up-analyzing {
+        font-size: 15px; color: rgba(63,66,71,0.5);
+    }
+
+    /* file info card */
+    .cfg-file {
+        display: flex; align-items: center; gap: 14px;
+        padding: 14px 16px;
+        background: rgba(79,218,15,0.05);
+        border: 1px solid rgba(79,218,15,0.18);
+        border-radius: 16px;
+        flex-shrink: 0;
+    }
+    .cfg-file-icon {
+        padding: 10px;
+        background: rgba(79,218,15,0.1);
+        border-radius: 10px;
+        flex-shrink: 0;
+    }
+    .cfg-file-name {
+        font-weight: 600; font-size: 14px; color: #3f4247;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cfg-file-meta {
+        font-size: 12px; color: rgba(63,66,71,0.45); margin-top: 2px;
+    }
+
+    /* section label */
+    .sec-label {
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 11px; letter-spacing: 4px;
+        text-transform: uppercase; color: rgba(63,66,71,0.4);
+        margin-bottom: 10px;
+    }
+
+    /* copies */
+    .copies-row {
+        display: flex; align-items: center; gap: 0;
+        background: rgba(79,218,15,0.05);
+        border: 1px solid rgba(79,218,15,0.18);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+    .copies-btn {
+        flex: 1;
+        height: 64px;
+        background: transparent;
+        border: none;
+        font-size: 28px; font-weight: 300;
+        color: #3ab30a;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: background 0.12s;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+    }
+    .copies-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+    .copies-btn:not(:disabled):active { background: rgba(79,218,15,0.12); }
+    .copies-divider {
+        width: 1px; height: 36px;
+        background: rgba(79,218,15,0.2);
+        flex-shrink: 0;
+    }
+    .copies-val {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 52px; letter-spacing: 2px;
+        color: #3f4247;
+        min-width: 80px; text-align: center; line-height: 1;
+        padding: 0 8px;
+    }
+
+    /* price card */
+    .price-card {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 20px 20px;
+        background: rgba(79,218,15,0.05);
+        border: 1px solid rgba(79,218,15,0.18);
+        border-radius: 16px;
+        flex-shrink: 0;
+    }
+    .price-label {
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 11px; letter-spacing: 4px;
+        text-transform: uppercase; color: rgba(63,66,71,0.4);
+    }
+    .price-val {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: clamp(36px, 10vw, 48px); letter-spacing: 2px;
+        color: #3f4247; line-height: 1; margin-top: 4px;
+    }
+    .price-breakdown { text-align: right; }
+    .price-line {
+        font-size: 13px; color: rgba(63,66,71,0.4); line-height: 1.7;
+    }
+
+    /* payment box */
+    .pay-box {
+        padding: 20px;
+        background: rgba(79,218,15,0.05);
+        border: 1px solid rgba(79,218,15,0.22);
+        border-radius: 16px;
+        display: flex; flex-direction: column; gap: 14px;
+        flex-shrink: 0;
+    }
+    .pay-heading {
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 14px; font-weight: 700; letter-spacing: 0.5px;
+        color: #3ab30a;
+    }
+    .pay-row {
+        display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    }
+    .pay-row-label {
+        font-size: 13px; color: rgba(63,66,71,0.45); flex-shrink: 0;
+    }
+    .pay-row-val {
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 13px; font-weight: 700; color: #3f4247;
+        background: rgba(79,218,15,0.08);
+        padding: 4px 10px; border-radius: 6px;
+        text-align: right; word-break: break-all;
+    }
+    .pay-note {
+        font-size: 12px; color: rgba(63,66,71,0.4);
+        border-top: 1px solid rgba(79,218,15,0.14);
+        padding-top: 10px;
+    }
+
+    /* input */
+    .input-label {
+        font-family: 'Barlow Condensed', sans-serif;
+        font-size: 11px; letter-spacing: 4px;
+        text-transform: uppercase; color: rgba(63,66,71,0.4);
+        display: block; margin-bottom: 8px;
+    }
+    .account-input {
+        width: 100%;
+        padding: 16px;
+        background: #ffffff;
+        border: 1.5px solid rgba(63,66,71,0.16);
+        border-radius: 14px;
+        font-family: 'Barlow', sans-serif;
+        font-size: 16px; color: #3f4247;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        -webkit-appearance: none;
+    }
+    .account-input::placeholder { color: rgba(63,66,71,0.28); }
+    .account-input:focus {
+        border-color: #4fda0f;
+        box-shadow: 0 0 0 3px rgba(79,218,15,0.12);
+    }
+    .input-hint {
+        font-size: 12px; color: rgba(63,66,71,0.38); margin-top: 6px;
+    }
+
+    /* sticky footer with action button */
+    .up-footer {
+        flex-shrink: 0;
+        padding: 16px 24px 36px;
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border-top: 1px solid rgba(63,66,71,0.07);
+    }
+
+    /* buttons */
+    .btn-green {
+        width: 100%;
+        padding: 19px 24px;
+        background: #4fda0f;
+        border: none; border-radius: 16px;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        cursor: pointer;
+        transition: opacity 0.12s, transform 0.1s;
+        box-shadow: 0 6px 24px rgba(79,218,15,0.35);
+        -webkit-tap-highlight-color: transparent;
+    }
+    .btn-green:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+    .btn-green:not(:disabled):active { transform: scale(0.98); }
+    .btn-green-text {
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 22px; letter-spacing: 3px;
+        color: #ffffff; text-transform: uppercase;
+    }
+
+    .btn-dark-green {
+        width: 100%;
+        padding: 19px 24px;
+        background: #3ab30a;
+        border: none; border-radius: 16px;
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 22px; letter-spacing: 3px;
+        color: #ffffff; text-transform: uppercase;
+        cursor: pointer;
+        transition: opacity 0.12s, transform 0.1s;
+        box-shadow: 0 6px 24px rgba(58,179,10,0.3);
+        -webkit-tap-highlight-color: transparent;
+    }
+    .btn-dark-green:disabled { opacity: 0.32; cursor: not-allowed; box-shadow: none; }
+    .btn-dark-green:not(:disabled):active { transform: scale(0.98); }
+
+    .btn-dark {
+        width: 100%;
+        padding: 19px 24px;
+        background: #3f4247;
+        border: none; border-radius: 16px;
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 22px; letter-spacing: 3px;
+        color: #ffffff; text-transform: uppercase;
+        cursor: pointer;
+        transition: opacity 0.12s, transform 0.1s;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .btn-dark:active { transform: scale(0.98); opacity: 0.88; }
+
+    /* spacer at bottom of scrollable area so content isn't hidden behind footer */
+    .scroll-spacer { height: 8px; flex-shrink: 0; }
+`;
 
 function UploadPageContent() {
     const searchParams = useSearchParams();
@@ -12,316 +505,383 @@ function UploadPageContent() {
     const kioskId = searchParams.get('kiosk_id') || 'default';
 
     const [file, setFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
-    const [metadata, setMetadata] = useState<{ pageCount: number, fileId: string } | null>(null);
+    const [metadata, setMetadata] = useState<{ pageCount: number; fileId: string } | null>(null);
     const [jobId, setJobId] = useState<number | null>(null);
     const [accountTitle, setAccountTitle] = useState('');
-    const [isVerifying, setIsVerifying] = useState(false);
     const [copies, setCopies] = useState(1);
-    const [status, setStatus] = useState<'IDLE' | 'UPLOADING' | 'CONFIGURING' | 'PAYING' | 'VERIFYING_PAYMENT' | 'SUCCESS' | 'COMPLETED'>('IDLE');
+    const [status, setStatus] = useState<Status>('IDLE');
+    const [isCreatingJob, setIsCreatingJob] = useState(false);
 
-    // Poll for status when in success/printing state
+    const totalPrice = metadata ? metadata.pageCount * copies * PRICE_PER_PAGE_PKR : 0;
+
     useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (status === 'SUCCESS' && jobId) {
-            interval = setInterval(async () => {
-                try {
-                    const res = await fetch(`${API_BASE}/api/jobs/${jobId}`);
-                    const job = await res.json();
-                    if (job.status === 'COMPLETED') {
-                        setStatus('COMPLETED');
-                        clearInterval(interval);
-                    }
-                } catch (e) {
-                    console.error('Polling error', e);
+        if (!jobId || (status !== 'SUCCESS' && status !== 'AWAITING_ADMIN')) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/jobs/${jobId}`);
+                if (!res.ok) return;
+                const job = await res.json();
+
+                if (status === 'AWAITING_ADMIN' && job.status === 'PAID') {
+                    setStatus('SUCCESS');
+                } else if (status === 'SUCCESS' && job.status === 'COMPLETED') {
+                    setStatus('COMPLETED');
                 }
-            }, 2000);
-        }
+            } catch { /* keep polling */ }
+        }, 3000);
+
         return () => clearInterval(interval);
     }, [status, jobId]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const selectedFile = e.target.files[0];
-            setFile(selectedFile);
-            await uploadFile(selectedFile);
-        }
-    };
-
-    const uploadFile = async (fileToUpload: File) => {
-        setUploading(true);
+        const selectedFile = e.target.files?.[0];
+        if (!selectedFile) return;
+        setFile(selectedFile);
         setStatus('UPLOADING');
 
         const formData = new FormData();
-        formData.append('file', fileToUpload);
+        formData.append('file', selectedFile);
 
         try {
-            const res = await fetch(`${API_BASE}/api/upload`, {
-                method: 'POST',
-                body: formData,
-            });
+            const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: formData });
             const data = await res.json();
-
-            if (res.ok) {
-                setMetadata(data);
-                setStatus('CONFIGURING');
-            } else {
-                alert('Upload failed');
-                setStatus('IDLE');
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Upload error');
-            setStatus('IDLE');
-        } finally {
-            setUploading(false);
-        }
+            if (res.ok) { setMetadata(data); setStatus('CONFIGURING'); }
+            else { setStatus('IDLE'); }
+        } catch { setStatus('IDLE'); }
     };
 
     const handleCreateJob = async () => {
-        if (!metadata) return;
-        setStatus('PAYING');
-
+        if (!metadata || isCreatingJob) return;
+        setIsCreatingJob(true);
         try {
             const res = await fetch(`${API_BASE}/api/jobs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    fileId: metadata.fileId,
-                    pageCount: metadata.pageCount,
-                    copies,
-                    kioskId
-                })
+                body: JSON.stringify({ fileId: metadata.fileId, pageCount: metadata.pageCount, copies, kioskId }),
             });
             const job = await res.json();
-
-            if (res.ok) {
-                setJobId(job.id);
-                // Stay on PAYING - show bank transfer UI
-            } else {
-                alert('Job creation failed');
-                setStatus('CONFIGURING');
-            }
-        } catch (err) {
-            console.error(err);
-            setStatus('CONFIGURING');
-        }
+            if (res.ok) { setJobId(job.id); setStatus('PAYING'); }
+        } catch { /* stay on CONFIGURING */ }
+        finally { setIsCreatingJob(false); }
     };
 
     const handleVerifyPayment = async () => {
-        if (!jobId || !accountTitle.trim()) {
-            alert('Please enter your account title');
-            return;
-        }
-        setIsVerifying(true);
+        if (!jobId || !accountTitle.trim()) return;
         setStatus('VERIFYING_PAYMENT');
-
         try {
             const res = await fetch(`${API_BASE}/api/jobs/${jobId}/verify-payment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accountTitle: accountTitle.trim() })
+                body: JSON.stringify({ accountTitle: accountTitle.trim() }),
             });
-            const data = await res.json();
-
-            if (res.ok) {
-                setStatus('SUCCESS');
-            } else {
-                alert(data.error || 'Payment verification failed');
-                setStatus('PAYING');
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Verification failed. Please try again.');
-            setStatus('PAYING');
-        } finally {
-            setIsVerifying(false);
-        }
+            setStatus(res.ok ? 'SUCCESS' : 'AWAITING_ADMIN');
+        } catch { setStatus('AWAITING_ADMIN'); }
     };
 
-    const PRICE_PER_PAGE_PKR = 10;
-    const totalPrice = metadata ? metadata.pageCount * copies * PRICE_PER_PAGE_PKR : 0;
+    // ─── Full-screen: Verifying ───────────────────────────────────────────────
 
-    if (status === 'SUCCESS' || status === 'COMPLETED') {
-        const isCompleted = status === 'COMPLETED';
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-6 text-center">
-                <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md flex flex-col items-center space-y-6">
-
-                    {isCompleted ? (
-                        <CheckCircle size={80} weight="fill" className="text-green-500 animate-bounce" />
-                    ) : (
-                        <div className="relative w-20 h-20">
-                            <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
-                            <div className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
-                            <Printer size={32} className="absolute inset-0 m-auto text-blue-500" />
+    if (status === 'VERIFYING_PAYMENT') return (
+        <>
+            <style>{STYLES}</style>
+            <div className="page-bg" />
+            <div className="fs-shell">
+                <div className="fs-inner">
+                    <div className="ring-wrap">
+                        <div className="ring-bg" />
+                        <div className="ring-spin" />
+                        <div className="ring-center">
+                            <Spinner size={32} weight="bold" color="#4fda0f" />
                         </div>
-                    )}
-
-                    <h2 className="text-3xl font-bold text-gray-900">
-                        {isCompleted ? 'Printing Complete!' : 'Printing in Progress...'}
-                    </h2>
-
-                    <p className="text-gray-600 text-lg">
-                        {isCompleted
-                            ? 'Please collect your documents below.'
-                            : `Sending ${copies} cop${copies > 1 ? 'ies' : 'y'} to the printer.`}
-                    </p>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                        <div
-                            className={`h-full bg-blue-500 transition-all duration-1000 ease-out ${isCompleted ? 'w-full' : 'w-2/3 animate-pulse'}`}
-                        />
                     </div>
-                    <p className="text-sm text-gray-500 font-mono">
-                        Status: {isCompleted ? 'DONE' : 'PRINTING'}
-                    </p>
-
-                    {isCompleted && (
-                        <button
-                            onClick={() => router.push(`/?kiosk_id=${kioskId}`)}
-                            className="mt-8 px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 w-full"
-                        >
-                            Print Another
-                        </button>
-                    )}
+                    <h2 className="fs-headline">Verifying Payment</h2>
+                    <p className="fs-body">Checking your NayaPay transaction. This takes a few seconds…</p>
+                    <div className="fs-card">
+                        <div className="fs-price">PKR {totalPrice}</div>
+                        {jobId && <div className="fs-job-id">Job #{jobId}</div>}
+                    </div>
                 </div>
             </div>
-        );
-    }
+        </>
+    );
+
+    // ─── Full-screen: Awaiting Admin ─────────────────────────────────────────
+
+    if (status === 'AWAITING_ADMIN') return (
+        <>
+            <style>{STYLES}</style>
+            <div className="page-bg" />
+            <div className="fs-shell">
+                <div className="fs-inner">
+                    <div className="pending-wrap">
+                        <div className="pending-pulse" />
+                        <div className="pending-border">
+                            <Clock size={46} weight="duotone" color="#f59e0b" />
+                        </div>
+                    </div>
+                    <h2 className="fs-headline">Payment Under Review</h2>
+                    <p className="fs-body">
+                        We couldn&apos;t auto-verify your payment. Our team has been notified and is
+                        reviewing it — you&apos;ll be moved to the print queue automatically.
+                    </p>
+                    <div className="fs-card">
+                        <div className="fs-price">PKR {totalPrice}</div>
+                        {accountTitle && <div className="fs-account">{accountTitle}</div>}
+                        {jobId && <div className="fs-job-id">Job #{jobId}</div>}
+                    </div>
+                    <div className="live-row">
+                        <span className="live-dot dot-amber" />
+                        Waiting for approval — updates automatically
+                    </div>
+                    <p className="wait-note">
+                        Typical wait: 1–5 minutes.{' '}
+                        <strong>Do not close this screen.</strong>
+                    </p>
+                </div>
+            </div>
+        </>
+    );
+
+    // ─── Full-screen: Printing ────────────────────────────────────────────────
+
+    if (status === 'SUCCESS') return (
+        <>
+            <style>{STYLES}</style>
+            <div className="page-bg" />
+            <div className="fs-shell">
+                <div className="fs-inner">
+                    <div className="ring-wrap">
+                        <div className="ring-bg" />
+                        <div className="ring-spin" />
+                        <div className="ring-center">
+                            <Printer size={34} weight="duotone" color="#4fda0f" />
+                        </div>
+                    </div>
+                    <h2 className="fs-headline">Payment Confirmed!</h2>
+                    <p className="fs-body">
+                        Sending {copies} {copies === 1 ? 'copy' : 'copies'} to the printer.
+                        Please wait near the machine.
+                    </p>
+                    <div className="fs-card">
+                        <div className="fs-price">PKR {totalPrice}</div>
+                        {jobId && <div className="fs-job-id">Job #{jobId}</div>}
+                    </div>
+                    <div className="live-row">
+                        <span className="live-dot dot-green" />
+                        Printing in progress
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+
+    // ─── Full-screen: Completed ───────────────────────────────────────────────
+
+    if (status === 'COMPLETED') return (
+        <>
+            <style>{STYLES}</style>
+            <div className="page-bg" />
+            <div className="fs-shell">
+                <div className="fs-inner">
+                    <div className="done-icon">
+                        <CheckCircle size={54} weight="fill" color="#4fda0f" />
+                    </div>
+                    <h2 className="fs-headline">All Done!</h2>
+                    <p className="fs-body">
+                        Your documents are ready. Please collect them from the printer.
+                    </p>
+                    <button
+                        className="btn-dark"
+                        style={{ marginTop: 8 }}
+                        onClick={() => router.push(`/?kiosk_id=${kioskId}`)}
+                    >
+                        Print Another Document
+                    </button>
+                </div>
+            </div>
+        </>
+    );
+
+    // ─── Upload / Configure / Pay flow ───────────────────────────────────────
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
-            <header className="w-full max-w-lg flex justify-between items-center mb-8">
-                <h1 className="text-xl font-bold text-gray-800">Kiosk Upload</h1>
-                <span className="text-sm bg-gray-200 px-3 py-1 rounded-full text-gray-600">ID: {kioskId}</span>
-            </header>
+        <>
+            <style>{STYLES}</style>
+            <div className="page-bg" />
+            <div className="up-shell">
 
-            <main className="w-full max-w-lg bg-white rounded-3xl shadow-xl overflow-hidden">
-                {/* Upload Section */}
-                {status === 'IDLE' || status === 'UPLOADING' ? (
-                    <div className="p-8 flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-gray-200 m-4 rounded-2xl bg-gray-50/50 hover:bg-gray-50 transition-colors relative">
-                        {uploading ? (
-                            <div className="flex flex-col items-center space-y-4">
-                                <Spinner size={48} className="animate-spin text-blue-600" />
-                                <p className="text-gray-500 font-medium">Analyzing document...</p>
-                            </div>
-                        ) : (
-                            <>
-                                <CloudArrowUp size={64} className="text-blue-500 mb-4" />
-                                <p className="text-xl font-semibold text-gray-700 mb-2">Upload your file</p>
-                                <p className="text-sm text-gray-400 mb-6 text-center">Supports PDF, JPG, PNG up to 10MB</p>
-                                <label className="relative cursor-pointer">
-                                    <span className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all">
-                                        Choose File
-                                    </span>
-                                    <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".pdf,image/*" />
-                                </label>
-                            </>
-                        )}
-                    </div>
-                ) : (
-                    /* Configuration Section */
-                    <div className="p-8 space-y-8">
-                        <div className="flex items-center space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                            <div className="p-3 bg-blue-100 rounded-lg text-blue-600">
-                                <FilePdf size={32} />
-                            </div>
-                            <div className="flex-1">
-                                <p className="font-semibold text-gray-900 truncate">{file?.name}</p>
-                                <p className="text-sm text-gray-500">{metadata?.pageCount} Pages • {((file?.size || 0) / 1024 / 1024).toFixed(2)} MB</p>
-                            </div>
-                        </div>
+                {/* Fixed header */}
+                <header className="up-header">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo.jpeg" alt="Print It" className="up-logo" />
+                    <span className="up-kiosk-id">{kioskId}</span>
+                </header>
 
-                        <div className="space-y-4">
-                            <label className="block text-sm font-medium text-gray-700 uppercase tracking-wide">Number of Copies</label>
-                            <div className="flex items-center space-x-4">
-                                <button
-                                    onClick={() => setCopies(Math.max(1, copies - 1))}
-                                    className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-xl font-bold hover:bg-gray-200"
-                                >-</button>
-                                <span className="text-3xl font-bold text-gray-900 w-16 text-center">{copies}</span>
-                                <button
-                                    onClick={() => setCopies(copies + 1)}
-                                    className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-xl font-bold hover:bg-gray-200"
-                                >+</button>
-                            </div>
-                        </div>
+                {/* Scrollable content */}
+                <div className="up-body">
 
-                        <div className="pt-6 border-t border-gray-100 space-y-4">
-                            <div className="flex justify-between items-center text-gray-600">
-                                <span>Price per page</span>
-                                <span>PKR {PRICE_PER_PAGE_PKR}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-2xl font-bold text-gray-900">
-                                <span>Total</span>
-                                <span>PKR {totalPrice}</span>
-                            </div>
-
-                            {status === 'PAYING' || status === 'VERIFYING_PAYMENT' ? (
-                                <div className="space-y-4 animate-fade-in">
-                                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-800 space-y-2">
-                                        <p>
-                                            Please transfer <b>PKR {totalPrice}</b> to your NayaPay account:
-                                        </p>
-                                        <ul className="text-xs space-y-1">
-                                            <li><b>Bank</b>: Naya Pay</li>
-                                            <li><b>Account Title</b>: Ayesha Awais</li>
-                                            <li><b>NayaPay Account #</b>: 03234563464</li>
-                                            <li><b>NayaPay ID</b>: ayesha.624@nayapay</li>
-                                            <li><b>IBAN</b>: PK26NAYA1234503234563464</li>
-                                        </ul>
-                                        <p className="text-xs mt-1">
-                                            Make sure you send the exact amount so we can auto-verify your payment from the NayaPay email.
-                                        </p>
+                    {/* ── IDLE / UPLOADING ── */}
+                    {(status === 'IDLE' || status === 'UPLOADING') && (
+                        <div className="up-zone-wrap">
+                            {status === 'UPLOADING' ? (
+                                <div className="up-uploading">
+                                    <div className="up-spinner-bg">
+                                        <Spinner size={30} weight="bold" color="#4fda0f" className="animate-spin" />
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Your Account Title in NayaPay</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Ayesha Awais"
-                                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                            value={accountTitle}
-                                            onChange={(e) => setAccountTitle(e.target.value)}
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            We match this with the <b>Destination Acc. Title</b> in your NayaPay email.
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={handleVerifyPayment}
-                                        disabled={isVerifying}
-                                        className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold text-lg shadow-xl hover:bg-green-700 transition-all disabled:opacity-50 flex justify-center items-center gap-2"
-                                    >
-                                        {isVerifying ? <Spinner className="animate-spin" /> : 'I Have Paid'}
-                                    </button>
+                                    <p className="up-analyzing">Analyzing document…</p>
                                 </div>
                             ) : (
-                                <button
-                                    onClick={handleCreateJob}
-                                    className="w-full py-4 bg-black text-white rounded-2xl font-bold text-lg shadow-xl shadow-gray-900/10 hover:bg-gray-800 transition-all flex justify-center items-center gap-2"
-                                >
-                                    Proceed to Payment
-                                </button>
+                                <label className="up-drop-label">
+                                    <div className="up-icon-bg">
+                                        <CloudArrowUp size={36} color="#3ab30a" />
+                                    </div>
+                                    <p className="up-tap-text">Tap to select file</p>
+                                    <p className="up-file-types">PDF, JPG, or PNG</p>
+                                    <input
+                                        type="file"
+                                        onChange={handleFileChange}
+                                        style={{ display: 'none' }}
+                                        accept=".pdf,image/*"
+                                    />
+                                </label>
                             )}
                         </div>
+                    )}
+
+                    {/* ── CONFIGURING / PAYING ── */}
+                    {(status === 'CONFIGURING' || status === 'PAYING') && metadata && (
+                        <>
+                            {/* File info */}
+                            <div className="cfg-file">
+                                <div className="cfg-file-icon">
+                                    <FilePdf size={28} color="#3ab30a" />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div className="cfg-file-name">{file?.name}</div>
+                                    <div className="cfg-file-meta">
+                                        {metadata.pageCount} pages &middot; {((file?.size || 0) / 1024 / 1024).toFixed(2)} MB
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Copies */}
+                            <div>
+                                <div className="sec-label">Copies</div>
+                                <div className="copies-row">
+                                    <button
+                                        className="copies-btn"
+                                        onClick={() => setCopies(c => Math.max(1, c - 1))}
+                                        disabled={copies <= 1 || status === 'PAYING'}
+                                    >
+                                        −
+                                    </button>
+                                    <div className="copies-divider" />
+                                    <span className="copies-val">{copies}</span>
+                                    <div className="copies-divider" />
+                                    <button
+                                        className="copies-btn"
+                                        onClick={() => setCopies(c => c + 1)}
+                                        disabled={status === 'PAYING'}
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Price summary */}
+                            <div className="price-card">
+                                <div>
+                                    <div className="price-label">Total</div>
+                                    <div className="price-val">PKR {totalPrice}</div>
+                                </div>
+                                <div className="price-breakdown">
+                                    <div className="price-line">{metadata.pageCount} pages × {copies} {copies === 1 ? 'copy' : 'copies'}</div>
+                                    <div className="price-line">PKR {PRICE_PER_PAGE_PKR} per page</div>
+                                </div>
+                            </div>
+
+                            {/* Payment instructions (PAYING only) */}
+                            {status === 'PAYING' && (
+                                <>
+                                    <div className="pay-box">
+                                        <div className="pay-heading">
+                                            Transfer exactly PKR {totalPrice} to:
+                                        </div>
+                                        {([
+                                            ['Account', 'Ayesha Awais'],
+                                            ['NayaPay #', '03234563464'],
+                                            ['ID', 'ayesha.624@nayapay'],
+                                            ['IBAN', 'PK26NAYA1234503234563464'],
+                                        ] as [string, string][]).map(([label, value]) => (
+                                            <div key={label} className="pay-row">
+                                                <span className="pay-row-label">{label}</span>
+                                                <span className="pay-row-val">{value}</span>
+                                            </div>
+                                        ))}
+                                        <p className="pay-note">
+                                            Send the exact amount to enable auto-verification.
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label className="input-label">
+                                            Your NayaPay Account Title
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="account-input"
+                                            placeholder="e.g. Muhammad Ali"
+                                            value={accountTitle}
+                                            onChange={e => setAccountTitle(e.target.value)}
+                                            autoComplete="off"
+                                            autoCorrect="off"
+                                        />
+                                        <p className="input-hint">
+                                            Must match the name shown in your NayaPay account exactly.
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+                        </>
+                    )}
+
+                    <div className="scroll-spacer" />
+                </div>
+
+                {/* Sticky footer action button */}
+                {(status === 'CONFIGURING' || status === 'PAYING') && (
+                    <div className="up-footer">
+                        {status === 'CONFIGURING' && (
+                            <button
+                                className="btn-green"
+                                onClick={handleCreateJob}
+                                disabled={isCreatingJob}
+                            >
+                                {isCreatingJob
+                                    ? <><Spinner size={20} className="animate-spin" />&nbsp;&nbsp;Processing…</>
+                                    : <span className="btn-green-text">Proceed to Payment</span>
+                                }
+                            </button>
+                        )}
+                        {status === 'PAYING' && (
+                            <button
+                                className="btn-dark-green"
+                                onClick={handleVerifyPayment}
+                                disabled={!accountTitle.trim()}
+                            >
+                                I Have Paid
+                            </button>
+                        )}
                     </div>
                 )}
-            </main>
-        </div>
+            </div>
+        </>
     );
 }
 
 export default function UploadPage() {
     return (
-        <Suspense
-            fallback={
-                <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
-                    Loading upload page...
-                </div>
-            }
-        >
+        <Suspense fallback={<div style={{ height: '100svh', background: '#ffffff' }} />}>
             <UploadPageContent />
         </Suspense>
     );

@@ -100,7 +100,7 @@ self.__SERVER_FILES_MANIFEST={
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "/Users/abdullah/Downloads/Prinitng Auto",
+    "outputFileTracingRoot": "/Users/abdullah/Downloads/Printing-Auto",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -293,7 +293,7 @@ self.__SERVER_FILES_MANIFEST={
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.js",
     "turbopack": {
-      "root": "/Users/abdullah/Downloads/Prinitng Auto"
+      "root": "/Users/abdullah/Downloads/Printing-Auto"
     },
     "distDirRoot": ".next",
     "_originalRewrites": {
@@ -311,7 +311,7 @@ self.__SERVER_FILES_MANIFEST={
       "fallback": []
     }
   },
-  "appDir": "/Users/abdullah/Downloads/Prinitng Auto/apps/web",
+  "appDir": "/Users/abdullah/Downloads/Printing-Auto/apps/web",
   "relativeAppDir": "apps/web",
   "files": [
     ".next/routes-manifest.json",

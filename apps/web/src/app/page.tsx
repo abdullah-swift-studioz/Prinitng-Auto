@@ -1,61 +1,211 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useRouter } from 'next/navigation';
-import { QrCode, ArrowRight } from 'phosphor-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 function HomeContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const kioskId = searchParams.get('kiosk_id') || 'default';
 
-    const handleStart = () => {
-        router.push(`/upload?kiosk_id=${kioskId}`);
-    };
-
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-6">
-            <div className="w-full max-w-md flex flex-col items-center text-center space-y-8 animate-fade-in">
+        <>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700;800&display=swap');
 
-                <div className="p-4 bg-white/10 rounded-full backdrop-blur-md shadow-xl border border-white/20">
-                    <QrCode size={64} weight="duotone" className="text-blue-400" />
+                *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+                html, body { height: 100%; }
+
+                .home-root {
+                    height: 100svh;
+                    background: #ffffff;
+                    position: relative;
+                    overflow: hidden;
+                    font-family: 'Barlow', sans-serif;
+                    display: flex;
+                    flex-direction: column;
+                }
+                .home-root::before {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    background-image:
+                        linear-gradient(rgba(79,218,15,0.08) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(79,218,15,0.08) 1px, transparent 1px);
+                    background-size: 32px 32px;
+                    pointer-events: none;
+                    z-index: 0;
+                }
+
+                /* header */
+                .home-header {
+                    position: relative;
+                    z-index: 1;
+                    padding: 44px 28px 0;
+                    flex-shrink: 0;
+                }
+                .home-logo {
+                    width: 100px;
+                    height: auto;
+                    object-fit: contain;
+                    display: block;
+                }
+
+                /* hero — fills remaining space */
+                .home-hero {
+                    flex: 1;
+                    position: relative;
+                    z-index: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    padding: 0 28px;
+                }
+                .home-eyebrow {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-family: 'Barlow Condensed', sans-serif;
+                    font-size: 12px;
+                    letter-spacing: 5px;
+                    text-transform: uppercase;
+                    color: #3ab30a;
+                    margin-bottom: 16px;
+                }
+                .eyebrow-dot {
+                    width: 6px; height: 6px;
+                    background: #4fda0f;
+                    border-radius: 50%;
+                    flex-shrink: 0;
+                    animation: blink 1.5s ease-in-out infinite;
+                }
+                @keyframes blink {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.3; transform: scale(0.6); }
+                }
+                .home-headline {
+                    font-family: 'Bebas Neue', sans-serif;
+                    font-size: clamp(72px, 23vw, 120px);
+                    line-height: 0.9;
+                    letter-spacing: 2px;
+                    color: #3f4247;
+                    margin-bottom: 20px;
+                }
+                .home-headline em {
+                    font-style: normal;
+                    color: transparent;
+                    -webkit-text-stroke: 2.5px #4fda0f;
+                }
+                .home-sub {
+                    font-size: 16px;
+                    font-weight: 300;
+                    color: rgba(63,66,71,0.52);
+                    line-height: 1.65;
+                    letter-spacing: 0.3px;
+                }
+
+                /* footer CTA — always at bottom */
+                .home-footer {
+                    position: relative;
+                    z-index: 1;
+                    padding: 0 28px 40px;
+                    flex-shrink: 0;
+                }
+                .start-btn {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    padding: 20px 24px;
+                    background: #4fda0f;
+                    border: none;
+                    border-radius: 16px;
+                    cursor: pointer;
+                    transition: transform 0.12s ease, box-shadow 0.12s ease;
+                    box-shadow: 0 8px 32px rgba(79,218,15,0.4);
+                    -webkit-tap-highlight-color: transparent;
+                }
+                .start-btn:active {
+                    transform: scale(0.97);
+                    box-shadow: 0 2px 12px rgba(79,218,15,0.25);
+                }
+                .start-btn-text {
+                    font-family: 'Bebas Neue', sans-serif;
+                    font-size: 24px;
+                    letter-spacing: 4px;
+                    color: #ffffff;
+                    text-transform: uppercase;
+                }
+                .start-btn-arrow {
+                    width: 22px; height: 22px;
+                    stroke: #ffffff;
+                    fill: none;
+                    stroke-width: 2.5;
+                    stroke-linecap: round;
+                    stroke-linejoin: round;
+                    flex-shrink: 0;
+                }
+                .kiosk-id-pill {
+                    margin-top: 16px;
+                    text-align: center;
+                    font-family: 'Barlow Condensed', sans-serif;
+                    font-size: 11px;
+                    letter-spacing: 4px;
+                    text-transform: uppercase;
+                    color: rgba(63,66,71,0.28);
+                }
+            `}</style>
+
+            <div className="home-root">
+                <div className="home-header">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo.jpeg" alt="Print It" className="home-logo" />
                 </div>
 
-                <div className="space-y-2">
-                    <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-                        Printing Kiosk
+                <div className="home-hero">
+                    <div className="home-eyebrow">
+                        <span className="eyebrow-dot" />
+                        Ready to Print
+                    </div>
+                    <h1 className="home-headline">
+                        Print<br />
+                        <em>Anything.</em><br />
+                        Instantly.
                     </h1>
-                    <p className="text-gray-400 text-lg">
-                        Scan. Upload. Print.
+                    <p className="home-sub">
+                        Upload your document, pay via NayaPay, and collect your printout — all in under 2 minutes.
                     </p>
                 </div>
 
-                <div className="w-full pt-8">
+                <div className="home-footer">
                     <button
-                        onClick={handleStart}
-                        className="group relative w-full flex items-center justify-center py-4 px-8 text-lg font-bold text-white bg-blue-600 rounded-2xl overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-lg shadow-blue-600/30"
+                        className="start-btn"
+                        onClick={() => router.push(`/upload?kiosk_id=${kioskId}`)}
                     >
-                        <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-blue-500 to-purple-600 opacity-100 group-hover:opacity-90 transition-opacity" />
-                        <span className="relative flex items-center gap-3">
-                            Start Printing <ArrowRight size={24} weight="bold" />
-                        </span>
+                        <span className="start-btn-text">Start Printing</span>
+                        <svg className="start-btn-arrow" viewBox="0 0 24 24">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                        </svg>
                     </button>
-                    <p className="mt-4 text-xs text-gray-600 font-mono">
-                        Kiosk ID: {kioskId}
-                    </p>
+                    <p className="kiosk-id-pill">Kiosk ID: {kioskId}</p>
                 </div>
-
             </div>
-        </div>
+        </>
     );
 }
 
 export default function Home() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white">
-                Loading...
+            <div style={{
+                height: '100svh', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', background: '#ffffff',
+                fontFamily: 'monospace', letterSpacing: '4px',
+                fontSize: '13px', color: '#3ab30a',
+            }}>
+                INITIALIZING...
             </div>
         }>
             <HomeContent />

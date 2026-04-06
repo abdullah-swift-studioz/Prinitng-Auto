@@ -1,15 +1,67 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Printer, ArrowsClockwise, CurrencyDollar, FileText, CheckCircle, Clock, Warning } from 'phosphor-react';
+import { useEffect, useState, useRef } from 'react';
+import { Printer, ArrowsClockwise, CurrencyDollar, FileText, CheckCircle, Clock, Warning, FilmStrip, Trash, UploadSimple } from 'phosphor-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
+interface AdVideo {
+    id: string;
+    filename: string;
+    originalname: string;
+    size: number;
+    uploadedAt: string;
+}
 
 export default function AdminDashboard() {
     const [jobs, setJobs] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [approvingId, setApprovingId] = useState<number | null>(null);
     const [confirmId, setConfirmId] = useState<number | null>(null);
+
+    // Ad videos state
+    const [videos, setVideos] = useState<AdVideo[]>([]);
+    const [videoUploading, setVideoUploading] = useState(false);
+    const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
+    const videoInputRef = useRef<HTMLInputElement>(null);
+
+    const fetchVideos = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/videos`);
+            if (res.ok) setVideos(await res.json());
+        } catch { /* ignore */ }
+    };
+
+    const uploadVideo = async (file: File) => {
+        setVideoUploading(true);
+        try {
+            const form = new FormData();
+            form.append('video', file);
+            const res = await fetch(`${API_BASE}/api/videos`, { method: 'POST', body: form });
+            if (res.ok) await fetchVideos();
+            else alert('Upload failed. Make sure the file is a valid video.');
+        } catch {
+            alert('Network error. Please try again.');
+        } finally {
+            setVideoUploading(false);
+            if (videoInputRef.current) videoInputRef.current.value = '';
+        }
+    };
+
+    const deleteVideo = async (id: string) => {
+        setDeletingVideoId(id);
+        try {
+            const res = await fetch(`${API_BASE}/api/videos/${id}`, { method: 'DELETE' });
+            if (res.ok) await fetchVideos();
+        } catch { /* ignore */ } finally {
+            setDeletingVideoId(null);
+        }
+    };
+
+    const formatBytes = (bytes: number) => {
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
 
     const fetchJobs = async () => {
         setLoading(true);
@@ -44,6 +96,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchJobs();
+        fetchVideos();
     }, []);
 
     const pendingJobs = jobs.filter(j => j.status === 'PENDING');
@@ -287,6 +340,85 @@ export default function AdminDashboard() {
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                {/* Ad Videos */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <FilmStrip size={22} weight="duotone" className="text-indigo-500" />
+                            <h2 className="text-xl font-bold text-gray-800">Kiosk Ad Videos</h2>
+                            <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                                {videos.length} video{videos.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <div>
+                            <input
+                                ref={videoInputRef}
+                                type="file"
+                                accept="video/*"
+                                className="hidden"
+                                onChange={e => { if (e.target.files?.[0]) uploadVideo(e.target.files[0]); }}
+                            />
+                            <button
+                                onClick={() => videoInputRef.current?.click()}
+                                disabled={videoUploading}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                            >
+                                <UploadSimple size={18} />
+                                {videoUploading ? 'Uploading...' : 'Upload Video'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {videos.length === 0 ? (
+                        <div className="px-6 py-12 text-center">
+                            <FilmStrip size={40} weight="duotone" className="text-gray-300 mx-auto mb-3" />
+                            <p className="text-gray-500 font-medium">No ad videos uploaded yet.</p>
+                            <p className="text-gray-400 text-sm mt-1">
+                                Uploaded videos will play on the kiosk display in a loop.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-gray-100">
+                            {videos.map((video, idx) => (
+                                <div key={video.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
+                                    {/* Order badge */}
+                                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center">
+                                        {idx + 1}
+                                    </span>
+
+                                    {/* Video thumbnail preview */}
+                                    <div className="flex-shrink-0 w-24 h-14 rounded-lg overflow-hidden bg-gray-900 border border-gray-200">
+                                        <video
+                                            src={`${API_BASE}/uploads/videos/${video.filename}`}
+                                            className="w-full h-full object-cover"
+                                            muted
+                                            preload="metadata"
+                                        />
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-800 truncate">{video.originalname}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">
+                                            {formatBytes(video.size)} &middot; Added {new Date(video.uploadedAt).toLocaleString()}
+                                        </p>
+                                    </div>
+
+                                    {/* Delete */}
+                                    <button
+                                        onClick={() => deleteVideo(video.id)}
+                                        disabled={deletingVideoId === video.id}
+                                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 border border-transparent hover:border-red-200 disabled:opacity-50 transition-colors"
+                                    >
+                                        <Trash size={16} />
+                                        {deletingVideoId === video.id ? 'Deleting…' : 'Delete'}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
             </div>

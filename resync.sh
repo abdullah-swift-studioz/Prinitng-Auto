@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-PROJECT_LOCAL="/Users/abdullah/Downloads/Prinitng Auto"
+PROJECT_LOCAL="/Users/abdullah/Downloads/Printing-Auto"
 REMOTE_HOST="ubuntu@16.16.218.28"
 SSH_KEY="/Users/abdullah/Downloads/mvg-key.pem"
 REMOTE_PATH="~/printit"
